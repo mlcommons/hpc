@@ -1,0 +1,7 @@
+[submodule "cosmoflow"]
+	path = cosmoflow
+	url = https://github.com/sparticlesteve/cosmoflow-benchmark
+	branch = mlperf-logging
+[submodule "deepcam"]
+	path = deepcam
+	url = https://github.com/azrael417/mlperf-deepcam
