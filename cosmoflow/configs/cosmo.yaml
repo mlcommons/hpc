@@ -1,0 +1,58 @@
+output_dir: results/cosmo-000
+
+mlperf:
+    org: LBNL
+    division: closed
+    status: onprem
+    platform: SUBMISSION_PLATFORM_PLACEHOLDER
+
+data:
+    name: cosmo
+    data_dir: /global/cscratch1/sd/sfarrell/cosmoflow-benchmark/data/cosmoUniverse_2019_05_4parE_tf
+    n_train: 262144
+    n_valid: 65536
+    sample_shape: [128, 128, 128, 4]
+    batch_size: 4
+    n_epochs: 128
+    shard: True
+    apply_log: True
+    prefetch: 4
+
+model:
+    name: cosmoflow
+    input_shape: [128, 128, 128, 4]
+    target_size: 4
+    conv_size: 32
+    fc1_size: 128
+    fc2_size: 64
+    hidden_activation: LeakyReLU
+    pooling_type: MaxPool3D
+    dropout: 0.5
+
+optimizer:
+    name: SGD
+    momentum: 0.9
+
+lr_schedule:
+    # Standard linear LR scaling configuration, tested up to batch size 1024
+    base_lr: 0.001
+    scaling: linear
+    base_batch_size: 64
+
+    # Alternate sqrt LR scaling which has worked well for batch size 512-1024.
+    #base_lr: 0.0025
+    #scaling: sqrt
+    #base_batch_size: 32
+
+    n_warmup_epochs: 4
+
+    # You may want to adjust these decay epochs depending on your batch size.
+    # E.g. if training batch size 64 you may want to decay at 16 and 32 epochs.
+    decay_schedule:
+        32: 0.25
+        64: 0.125
+
+train:
+    loss: mse
+    metrics: ['mae']
+    target_mae: 0.124
