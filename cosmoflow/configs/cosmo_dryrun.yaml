@@ -1,0 +1,49 @@
+output_dir: results/cosmo-dryrun
+
+mlperf:
+    org: LBNL
+    division: closed
+    status: onprem
+    platform: SUBMISSION_PLATFORM_PLACEHOLDER
+
+data:
+    name: cosmo
+    data_dir: /global/cscratch1/sd/sfarrell/cosmoflow-benchmark/data/cosmoUniverse_2019_05_4parE_tf
+    n_train: 64 #262144
+    n_valid: 64 #65536
+    sample_shape: [128, 128, 128, 4]
+    batch_size: 4
+    n_epochs: 1
+    shard: True
+    apply_log: True
+    prefetch: 4
+
+model:
+    name: cosmoflow
+    input_shape: [128, 128, 128, 4]
+    target_size: 4
+    conv_size: 32
+    fc1_size: 128
+    fc2_size: 64
+    hidden_activation: LeakyReLU
+    pooling_type: MaxPool3D
+    dropout: 0.5
+
+optimizer:
+    name: SGD
+    momentum: 0.9
+
+lr_schedule:
+    # Dummy configuration for dry-run; not intended for convergence
+    base_lr: 0.0001
+    scaling: linear
+    base_batch_size: 4
+    n_warmup_epochs: 4
+    decay_schedule:
+        32: 0.25
+        64: 0.125
+
+train:
+    loss: mse
+    metrics: ['mae']
+    target_mae: 1.
