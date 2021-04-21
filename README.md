@@ -1,4 +1,4 @@
-# MLPerf HPC reference implementations
+# MLPerf™ HPC reference implementations
 
 This is a repository of reference implementations for the MLPerf HPC benchmarks.
 
