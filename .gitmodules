@@ -1,3 +1,7 @@
 [submodule "deepcam"]
 	path = deepcam
 	url = https://github.com/azrael417/mlperf-deepcam
+[submodule "mlperf-deepcam"]
+	path = mlperf-deepcam
+	url = https://github.com/azrael417/mlperf-deepcam
+	branch = mlperf-hpc-v1.0
