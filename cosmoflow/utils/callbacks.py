@@ -35,7 +35,11 @@ import logging
 
 # Externals
 import tensorflow as tf
-from mlperf_logging import mllog
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 class MLPerfLoggingCallback(tf.keras.callbacks.Callback):
     """A Keras Callback for logging MLPerf results"""

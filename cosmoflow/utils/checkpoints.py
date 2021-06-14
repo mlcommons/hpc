@@ -35,31 +35,6 @@ import logging
 import tensorflow as tf
 import horovod.tensorflow.keras as hvd
 
-def load_hvd_model(checkpoint):
-    """Load model with Horovod setup.
-
-    This exists as a workaround for my horovod issue:
-    https://github.com/horovod/horovod/issues/1920
-
-    It takes care of wrapping the checkpoint optimizer in the horovod
-    DistributedOptimizer.
-
-    I've dropped support for compression, here, which may be useful.
-
-    See:
-    https://github.com/horovod/horovod/blob/master/horovod/tensorflow/keras/__init__.py
-    https://github.com/horovod/horovod/blob/master/horovod/_keras/__init__.py
-    """
-    def wrap_optimizer(cls):
-        return lambda **kwargs: hvd.DistributedOptimizer(cls(**kwargs))
-    horovod_objects = {
-        subclass.__name__.lower(): wrap_optimizer(subclass)
-        for subclass in tf.keras.optimizers.Optimizer.__subclasses__()
-        # This is the line that doesn't work in issue horovod/1920
-        #if subclass.__module__ == keras.optimizers.Optimizer.__module__
-    }
-    return tf.keras.models.load_model(checkpoint, custom_objects=horovod_objects)
-
 def reload_last_checkpoint(checkpoint_format, n_epochs, distributed):
     """Finds and loads the last checkpoint matching the provided pattern"""
     # Count down from n_epochs to 0 to find the last epoch.
@@ -71,7 +46,7 @@ def reload_last_checkpoint(checkpoint_format, n_epochs, distributed):
             logging.info('Found last checkpoint at %s', checkpoint)
             # Use special reload to prepare the DistributedOptimizer
             if distributed:
-                model = load_hvd_model(checkpoint)
+                model = hvd.load_model(checkpoint)
             else:
                 model = tf.keras.models.load_model(checkpoint)
             return epoch, model

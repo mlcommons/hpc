@@ -36,8 +36,12 @@ from functools import partial
 # External imports
 import numpy as np
 import tensorflow as tf
-from mlperf_logging import mllog
 import horovod.tensorflow.keras as hvd
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 # Local imports
 import utils.distributed
@@ -57,7 +61,7 @@ def _parse_data(sample_proto, shape, apply_log=False):
         sample_proto, features=feature_spec)
 
     # Decode the bytes data, convert to float
-    x = tf.decode_raw(parsed_example['x'], tf.int16)
+    x = tf.io.decode_raw(parsed_example['x'], tf.int16)
     x = tf.cast(tf.reshape(x, shape), tf.float32)
     y = parsed_example['y']
 
@@ -73,9 +77,10 @@ def _parse_data(sample_proto, shape, apply_log=False):
 
 def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
                       sample_shape, samples_per_file=1, n_file_sets=1,
-                      shard=0, n_shards=1, apply_log=False,
+                      shard=0, n_shards=1, apply_log=True,
                       randomize_files=False, shuffle=False,
-                      shuffle_buffer_size=0, n_parallel_reads=4, prefetch=4):
+                      shuffle_buffer_size=0, n_parallel_reads=4, prefetch=4,
+                      compression=None):
     """This function takes a folder with files and builds the TF dataset.
 
     It ensures that the requested sample counts are divisible by files,
@@ -113,12 +118,13 @@ def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
 
     # Parse TFRecords
     parse_data = partial(_parse_data, shape=sample_shape, apply_log=apply_log)
-    data = data.apply(tf.data.TFRecordDataset).map(
-        parse_data, num_parallel_calls=n_parallel_reads)
+    wrap_dataset = partial(tf.data.TFRecordDataset, compression_type=compression)
+    data = data.apply(wrap_dataset).map(parse_data, num_parallel_calls=n_parallel_reads)
 
     # Parallelize reading with interleave - no benefit?
     #data = data.interleave(
-    #    lambda x: tf.data.TFRecordDataset(x).map(parse_data, num_parallel_calls=1),
+    #    lambda x: tf.data.TFRecordDataset(x, compression_type=compression)
+    #              .map(parse_data, num_parallel_calls=1),
     #    cycle_length=4
     #)
 
@@ -149,7 +155,7 @@ def get_datasets(data_dir, sample_shape, n_train, n_valid,
     """
 
     # MLPerf logging
-    if dist.rank == 0:
+    if dist.rank == 0 and have_mlperf_logging:
         mllogger = mllog.get_mllogger()
         mllogger.event(key=mllog.constants.GLOBAL_BATCH_SIZE, value=batch_size*dist.size)
         mllogger.event(key=mllog.constants.TRAIN_SAMPLES, value=n_train)
@@ -160,8 +166,8 @@ def get_datasets(data_dir, sample_shape, n_train, n_valid,
     utils.distributed.barrier()
 
     # Local data staging
-    if dist.rank == 0:
-        mllogger.start(key=mllog.constants.STAGING_START)
+    if dist.rank == 0 and have_mlperf_logging:
+        mllogger.start(key='staging_start')
 
     if stage_dir is not None:
         staged_files = True
@@ -179,8 +185,8 @@ def get_datasets(data_dir, sample_shape, n_train, n_valid,
 
     # Barrier for workers to be done transferring
     utils.distributed.barrier()
-    if dist.rank == 0:
-        mllogger.end(key=mllog.constants.STAGING_STOP)
+    if dist.rank == 0 and have_mlperf_logging:
+        mllogger.end(key='staging_stop')
 
     # Determine number of staged file sets and worker shards
     n_file_sets = (dist.size // dist.local_size) if staged_files else 1

@@ -36,7 +36,11 @@ from functools import partial
 # Externals
 from tensorflow import keras
 import horovod.tensorflow.keras as hvd
-from mlperf_logging import mllog
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 # Locals
 import utils.distributed
@@ -80,7 +84,7 @@ def get_lr_schedule(base_lr, global_batch_size, base_batch_size=None,
     # conventions. Here we define base LR to be the LR at a baseline batch
     # size and the "peak" LR to be the value scaled according to current batch
     # size. We will leave things as-is for now.
-    if utils.distributed.rank() == 0:
+    if utils.distributed.rank() == 0 and have_mlperf_logging:
         mllogger = mllog.get_mllogger()
         mllogger.event(key=mllog.constants.OPT_BASE_LR, value=peak_lr)
         mllogger.event(key=mllog.constants.OPT_LR_WARMUP_EPOCHS, value=n_warmup_epochs)
@@ -97,7 +101,7 @@ def get_optimizer(name, distributed=False, **opt_args):
     """Configure the optimizer"""
 
     # MLPerf logging
-    if utils.distributed.rank() == 0:
+    if utils.distributed.rank() == 0 and have_mlperf_logging:
         mllogger = mllog.get_mllogger()
         mllogger.event(key=mllog.constants.OPT_NAME, value=name)
 

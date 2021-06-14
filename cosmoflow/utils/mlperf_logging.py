@@ -35,10 +35,16 @@ https://github.com/mlperf/logging
 import os
 
 # Externals
-from mlperf_logging import mllog
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 def configure_mllogger(log_dir):
     """Setup the MLPerf logger"""
+    if not have_mlperf_logging:
+        raise RuntimeError('mlperf_logging package unavailable')
     mllog.config(filename=os.path.join(log_dir, 'mlperf.log'))
     return mllog.get_mllogger()
 

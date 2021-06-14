@@ -45,7 +45,14 @@ import tensorflow as tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(logging.ERROR)
 import horovod.tensorflow.keras as hvd
-from mlperf_logging import mllog
+import wandb
+
+# MLPerf logging
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 # Local imports
 from data import get_datasets
@@ -72,6 +79,7 @@ def parse_args():
     add_arg = parser.add_argument
     add_arg('config', nargs='?', default='configs/cosmo.yaml')
     add_arg('--output-dir', help='Override output directory')
+    add_arg('--run-tag', help='Unique run tag for logging')
 
     # Override data settings
     add_arg('--data-dir', help='Override the path to input files')
@@ -106,8 +114,13 @@ def parse_args():
     add_arg('--kmp-blocktime', help='Set KMP_BLOCKTIME')
     add_arg('--kmp-affinity', help='Set KMP_AFFINITY')
     add_arg('--omp-num-threads', help='Set OMP_NUM_THREADS')
+    add_arg('--amp', action='store_true', help='Enable automatic mixed precision')
 
     # Other settings
+    add_arg('--mlperf', action='store_true',
+            help='Enable MLPerf logging')
+    add_arg('--wandb', action='store_true',
+            help='Enable W&B logging')
     add_arg('--tensorboard', action='store_true',
             help='Enable TB logger')
     add_arg('--print-fom', action='store_true',
@@ -214,10 +227,17 @@ def main():
         logging.info('Configuration: %s', config)
 
     # Setup MLPerf logging
-    mllogger = configure_mllogger(config['output_dir'])
-    if dist.rank == 0:
+    if args.mlperf:
+        mllogger = configure_mllogger(config['output_dir'])
+    if dist.rank == 0 and args.mlperf:
         mllogger.event(key=mllog.constants.CACHE_CLEAR)
         mllogger.start(key=mllog.constants.INIT_START)
+
+    # Initialize Weights & Biases logging
+    if args.wandb and dist.rank == 0:
+        import wandb
+        wandb.init(project='cosmoflow', name=args.run_tag, id=args.run_tag,
+                   config=config, resume=args.run_tag)
 
     # Device and session configuration
     gpu = dist.local_rank if args.rank_gpu else None
@@ -230,8 +250,20 @@ def main():
                       kmp_affinity=args.kmp_affinity,
                       omp_num_threads=args.omp_num_threads)
 
+    # Mixed precision
+    if args.amp:
+        logging.info('Enabling mixed float16 precision')
+
+        # Suggested bug workaround from https://github.com/tensorflow/tensorflow/issues/38516
+        if tf.__version__.startswith('2.2.'):
+            from tensorflow.python.keras.mixed_precision.experimental import device_compatibility_check
+            device_compatibility_check.log_device_compatibility_check = lambda policy_name, skip_local: None
+        tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+        # TF 2.3
+        #tf.keras.mixed_precision.set_global_policy('mixed_float16')
+
     # Start MLPerf logging
-    if dist.rank == 0:
+    if dist.rank == 0 and args.mlperf:
         log_submission_info(**config.get('mlperf', {}))
         mllogger.end(key=mllog.constants.INIT_STOP)
         mllogger.start(key=mllog.constants.RUN_START)
@@ -303,7 +335,10 @@ def main():
         if args.tensorboard:
             callbacks.append(tf.keras.callbacks.TensorBoard(
                 os.path.join(config['output_dir'], 'tensorboard')))
-        callbacks.append(MLPerfLoggingCallback())
+        if args.mlperf:
+            callbacks.append(MLPerfLoggingCallback())
+        if args.wandb:
+            callbacks.append(wandb.keras.WandbCallback())
 
     # Early stopping
     patience = train_config.get('early_stopping_patience', None)
@@ -332,12 +367,18 @@ def main():
               verbose=fit_verbose)
 
     # Stop MLPerf timer
-    if dist.rank == 0:
+    if dist.rank == 0 and args.mlperf:
         mllogger.end(key=mllog.constants.RUN_STOP, metadata={'status': 'success'})
 
     # Print training summary
     if dist.rank == 0:
         print_training_summary(config['output_dir'], args.print_fom)
+
+    # Print GPU memory - not supported in TF 2.2?
+    #if gpu is not None:
+    #    device = tf.config.list_physical_devices('GPU')[gpu]
+    #    #print(tf.config.experimental.get_memory_usage(device))
+    #    #print(tf.config.experimental.get_memory_info(device))
 
     # Finalize
     if dist.rank == 0:
