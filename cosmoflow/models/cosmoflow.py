@@ -31,6 +31,12 @@ import tensorflow as tf
 import tensorflow.keras.layers as layers
 import tensorflow.keras.regularizers as regularizers
 
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
+
 from .layers import scale_1p2
 
 def build_model(input_shape, target_size,
@@ -40,6 +46,11 @@ def build_model(input_shape, target_size,
                 pooling_type='MaxPool3D',
                 dropout=0.5):
     """Construct the CosmoFlow 3D CNN model"""
+
+    if have_mlperf_logging:
+        mllogger = mllog.get_mllogger()
+        mllogger.event(key=mllog.constants.OPT_WEIGHT_DECAY, value=l2)
+        mllogger.event(key='dropout', value=dropout)
 
     conv_args = dict(kernel_size=kernel_size, padding='same')
     hidden_activation = getattr(layers, hidden_activation)

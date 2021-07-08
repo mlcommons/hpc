@@ -77,10 +77,9 @@ def _parse_data(sample_proto, shape, apply_log=False):
 
 def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
                       sample_shape, samples_per_file=1, n_file_sets=1,
-                      shard=0, n_shards=1, apply_log=True,
-                      randomize_files=False, shuffle=False,
-                      shuffle_buffer_size=0, n_parallel_reads=4, prefetch=4,
-                      compression=None):
+                      shard=0, n_shards=1, apply_log=True, compression=None,
+                      randomize_files=False, shuffle=False, shuffle_buffer_size=0,
+                      n_parallel_reads=tf.data.AUTOTUNE, prefetch=tf.data.AUTOTUNE):
     """This function takes a folder with files and builds the TF dataset.
 
     It ensures that the requested sample counts are divisible by files,
