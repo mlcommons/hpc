@@ -6,14 +6,19 @@ General format should follow https://github.com/mlperf/training.
 
 ## Rules
 
-The MLPerf HPC v0.5 rules are based on the MLPerf Training v0.7 rules with
+The MLPerf HPC rules are based on the MLPerf Training rules with
 some adjustments.
 
-The MLPerf Training rules are available at [training\_rules](https://github.com/mlperf-hpc/training_policies/blob/hpc-0.5.0/training_rules.adoc).
+The MLPerf Training rules are available at [training\_rules](https://github.com/mlcommons/training_policies/blob/master/training_rules.adoc).
 
-The MLPerf HPC specific rules are at [hpc\_training\_rules](https://github.com/mlperf-hpc/training_policies/blob/hpc-0.5.0/hpc_training_rules.adoc).
+The MLPerf HPC specific rules are at [hpc\_training\_rules](https://github.com/mlcommons/training_policies/blob/master/hpc_training_rules.adoc).
 
 ## Compliance
+
+**IMPORTANT NOTE:** This section needs to be updated for HPC v1.0.
+For now the referenced version of the `mlperf-logging` repository should be fine
+for logging, but the compliance checking code and results summarizer code require
+update.
 
 The MLPerf logging package implements logging and compliance-checking utilities
 for MLPerf benchmarks. We have a temporary fork and hpc-0.5.0 branch in which we
