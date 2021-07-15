@@ -1,14 +1,24 @@
-output_dir: results/cosmo-dummy-000
+# This YAML file describes the configuration for the MLPerf HPC v0.7 reference.
+
+output_dir: results/cosmo-000
+
+mlperf:
+    org: LBNL
+    division: closed
+    status: onprem
+    platform: SUBMISSION_PLATFORM_PLACEHOLDER
 
 data:
-    name: dummy
-    n_train: 256
-    n_valid: 256
+    name: cosmo
+    data_dir: /global/cscratch1/sd/sfarrell/cosmoflow-benchmark/data/cosmoUniverse_2019_05_4parE_tf
+    n_train: 262144
+    n_valid: 65536
     sample_shape: [128, 128, 128, 4]
-    target_shape: [4]
     batch_size: 4
-    n_epochs: 4
+    n_epochs: 128
     shard: True
+    apply_log: True
+    prefetch: 4
 
 model:
     name: cosmoflow
@@ -47,4 +57,6 @@ lr_schedule:
 train:
     loss: mse
     metrics: ['mean_absolute_error']
-    early_stopping_patience: 8
+
+    # Uncomment to stop at target quality
+    #target_mae: 0.124

@@ -29,16 +29,28 @@
 
 import tensorflow as tf
 import tensorflow.keras.layers as layers
+import tensorflow.keras.regularizers as regularizers
+
+try:
+    from mlperf_logging import mllog
+    have_mlperf_logging = True
+except ImportError:
+    have_mlperf_logging = False
 
 from .layers import scale_1p2
 
 def build_model(input_shape, target_size,
-                conv_size=16, kernel_size=2, n_conv_layers=5,
-                fc1_size=128, fc2_size=64,
+                conv_size=32, kernel_size=3, n_conv_layers=5,
+                fc1_size=128, fc2_size=64, l2=0,
                 hidden_activation='LeakyReLU',
                 pooling_type='MaxPool3D',
-                dropout=0):
+                dropout=0.5):
     """Construct the CosmoFlow 3D CNN model"""
+
+    if have_mlperf_logging:
+        mllogger = mllog.get_mllogger()
+        mllogger.event(key=mllog.constants.OPT_WEIGHT_DECAY, value=l2)
+        mllogger.event(key='dropout', value=dropout)
 
     conv_args = dict(kernel_size=kernel_size, padding='same')
     hidden_activation = getattr(layers, hidden_activation)
@@ -60,10 +72,10 @@ def build_model(input_shape, target_size,
     model.add(layers.Flatten())
 
     # Fully-connected layers
-    model.add(layers.Dense(fc1_size))
+    model.add(layers.Dense(fc1_size, kernel_regularizer=regularizers.l2(l2)))
     model.add(hidden_activation())
     model.add(layers.Dropout(dropout))
-    model.add(layers.Dense(fc2_size))
+    model.add(layers.Dense(fc2_size, kernel_regularizer=regularizers.l2(l2)))
     model.add(hidden_activation())
     model.add(layers.Dropout(dropout))
 

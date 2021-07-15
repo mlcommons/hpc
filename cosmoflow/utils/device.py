@@ -39,9 +39,8 @@ import tensorflow as tf
 # Locals
 import utils.distributed as dist
 
-def configure_session(intra_threads=32, inter_threads=2,
-                      kmp_blocktime=None, kmp_affinity=None, omp_num_threads=None,
-                      gpu=None):
+def configure_session(gpu=None, intra_threads=None, inter_threads=None,
+                      kmp_blocktime=None, kmp_affinity=None, omp_num_threads=None):
     """Sets the thread knobs in the TF backend"""
     if kmp_blocktime is not None:
         os.environ['KMP_BLOCKTIME'] = str(kmp_blocktime)
@@ -57,10 +56,11 @@ def configure_session(intra_threads=32, inter_threads=2,
         logging.info('INTRA_THREADS %i', intra_threads)
         logging.info('INTER_THREADS %i', inter_threads)
 
-    config = tf.ConfigProto(
-        inter_op_parallelism_threads=inter_threads,
-        intra_op_parallelism_threads=intra_threads
-    )
     if gpu is not None:
-        config.gpu_options.visible_device_list = str(gpu)
-    tf.keras.backend.set_session(tf.Session(config=config))
+        gpu_devices = tf.config.list_physical_devices('GPU')
+        tf.config.set_visible_devices(gpu_devices[gpu], 'GPU')
+
+    if intra_threads is not None:
+        tf.config.threading.set_intra_op_parallelism_threads(intra_threads)
+    if inter_threads is not None:
+        tf.config.threading.set_inter_op_parallelism_threads(inter_threads)

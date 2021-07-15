@@ -1,3 +1,3 @@
 # Source this script to setup the runtime environment on cori
-module load tensorflow/gpu-1.15.0-py37
+module load cgpu tensorflow/2.4.1-gpu
 module list
