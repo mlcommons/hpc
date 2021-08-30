@@ -5,11 +5,13 @@
 #SBATCH --exclusive
 #SBATCH -t 4:00:00
 #SBATCH -J train-cgpu
-#SBATCH -d singleton
 #SBATCH -o logs/%x-%j.out
 
 . scripts/setup_cgpu.sh
 #export HOROVOD_TIMELINE=./timeline.json
+
+# Slurm job variables
+env | grep SLURM_JOB
 
 set -x
 srun -l -u python train.py -d --rank-gpu $@

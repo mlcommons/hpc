@@ -50,23 +50,23 @@ class MLPerfLoggingCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs={}):
         self.mllogger.start(key=mllog.constants.EPOCH_START,
-                            metadata={'epoch_num': epoch})
+                            metadata={'epoch_num': epoch + 1})
         self._epoch = epoch
 
     def on_test_begin(self, logs):
         self.mllogger.start(key=mllog.constants.EVAL_START,
-                            metadata={'epoch_num': self._epoch})
+                            metadata={'epoch_num': self._epoch + 1})
 
     def on_test_end(self, logs):
         self.mllogger.end(key=mllog.constants.EVAL_STOP,
-                          metadata={'epoch_num': self._epoch})
+                          metadata={'epoch_num': self._epoch + 1})
 
     def on_epoch_end(self, epoch, logs={}):
         self.mllogger.end(key=mllog.constants.EPOCH_STOP,
-                          metadata={'epoch_num': epoch})
+                          metadata={'epoch_num': epoch + 1})
         eval_metric = logs[self.metric]
         self.mllogger.event(key=self.log_key, value=eval_metric,
-                            metadata={'epoch_num': epoch})
+                            metadata={'epoch_num': epoch + 1})
 
 class StopAtTargetCallback(tf.keras.callbacks.Callback):
     """A Keras callback for stopping training at specified target quality"""

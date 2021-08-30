@@ -32,6 +32,7 @@ Hardware/device configuration
 # System
 import os
 import logging
+import socket
 
 # Externals
 import tensorflow as tf
@@ -58,6 +59,10 @@ def configure_session(gpu=None, intra_threads=None, inter_threads=None,
 
     if gpu is not None:
         gpu_devices = tf.config.list_physical_devices('GPU')
+        if len(gpu_devices) < gpu + 1:
+            raise RuntimeError(f'{socket.gethostname()}: ' +
+                               f'GPU {gpu} unavailable, ' +
+                               f'{len(gpu_devices)} visible')
         tf.config.set_visible_devices(gpu_devices[gpu], 'GPU')
 
     if intra_threads is not None:
