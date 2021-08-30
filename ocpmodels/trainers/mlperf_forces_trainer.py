@@ -365,9 +365,9 @@ class MLPerfForcesTrainer(BaseTrainer):
             mllogger.event(key=mllog.constants.OPT_LR_DECAY_BOUNDARY_STEPS, value=self.config["optim"]["lr_milestones"])
             mllogger.event(key=mllog.constants.OPT_LR_DECAY_FACTOR, value=self.config["optim"]["lr_gamma"])
 
-        # Begin the mlperf run
-        mllogger.end(key=mllog.constants.INIT_STOP)
-        mllogger.start(key=mllog.constants.RUN_START)
+            # Begin the mlperf run
+            mllogger.end(key=mllog.constants.INIT_STOP)
+            mllogger.start(key=mllog.constants.RUN_START)
 
         eval_every = self.config["optim"].get(
             "eval_every", len(self.train_loader)
@@ -389,8 +389,9 @@ class MLPerfForcesTrainer(BaseTrainer):
             + f"samples {len(self.val_loader.sampler)}"
         )
         for epoch in range(start_epoch, self.config["optim"]["max_epochs"]):
-            mllogger.start(key=mllog.constants.EPOCH_START,
-                           metadata={"epoch_num": epoch})
+            if distutils.is_master():
+                mllogger.start(key=mllog.constants.EPOCH_START,
+                               metadata={"epoch_num": epoch+1})
             self.train_sampler.set_epoch(epoch)
             skip_steps = 0
             if epoch == start_epoch and start_epoch > 0:
@@ -456,8 +457,9 @@ class MLPerfForcesTrainer(BaseTrainer):
                 # Evaluate on val set every `eval_every` iterations.
                 if iters % eval_every == 0:
                     if self.val_loader is not None:
-                        mllogger.start(key=mllog.constants.EVAL_START,
-                                       metadata={"epoch_num": epoch})
+                        if distutils.is_master():
+                            mllogger.start(key=mllog.constants.EVAL_START,
+                                           metadata={"epoch_num": epoch+1})
                         val_metrics = self.validate(
                             split="val",
                             epoch=epoch - 1 + (i + 1) / len(self.train_loader),
@@ -465,11 +467,12 @@ class MLPerfForcesTrainer(BaseTrainer):
                                 "disable_tqdm", False
                             ),
                         )
-                        mllogger.end(key=mllog.constants.EVAL_STOP,
-                                     metadata={"epoch_num": epoch})
-                        mllogger.event(key="eval_error",
-                                       value=val_metrics["forces_mae"]["metric"],
-                                       metadata={"epoch_num": epoch})
+                        if distutils.is_master():
+                            mllogger.end(key=mllog.constants.EVAL_STOP,
+                                         metadata={"epoch_num": epoch+1})
+                            mllogger.event(key="eval_error",
+                                           value=val_metrics["forces_mae"]["metric"],
+                                           metadata={"epoch_num": epoch+1})
                         if (
                             "mae" in primary_metric
                             and val_metrics[primary_metric]["metric"]
@@ -519,14 +522,16 @@ class MLPerfForcesTrainer(BaseTrainer):
                     self.scheduler.step()
 
             torch.cuda.empty_cache()
-            mllogger.end(key=mllog.constants.EPOCH_STOP,
-                         metadata={"epoch_num": epoch})
+            if distutils.is_master():
+                mllogger.end(key=mllog.constants.EPOCH_STOP,
+                             metadata={"epoch_num": epoch+1})
 
             # End training criteria
             if stop_training:
                 break
 
-        mllogger.end(key=mllog.constants.RUN_STOP, metadata={"status": "success"})
+        if distutils.is_master():
+            mllogger.end(key=mllog.constants.RUN_STOP, metadata={"status": "success"})
 
         self.train_dataset.close_db()
         if "val_dataset" in self.config:
