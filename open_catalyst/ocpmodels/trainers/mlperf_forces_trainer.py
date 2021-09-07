@@ -354,6 +354,15 @@ class MLPerfForcesTrainer(BaseTrainer):
             # Start mlperf initialization
             mllogger.start(key=mllog.constants.INIT_START)
 
+            # Weak-scaling HPC metrics
+            accelerators_per_node = self.config["task"]["mlperf_accelerators_per_node"]
+            accelerators_per_rank = self.config["task"]["mlperf_accelerators_per_rank"]
+            num_ranks = distutils.get_world_size()
+            num_nodes = (num_ranks * accelerators_per_rank) // accelerators_per_node
+            mllogger.event(key='number_of_ranks', value=num_ranks)
+            mllogger.event(key='number_of_nodes', value=num_nodes)
+            mllogger.event(key='accelerators_per_node', value=accelerators_per_node)
+
             # Log hyperparameters
             mllogger.event(key=mllog.constants.GLOBAL_BATCH_SIZE,
                            value=self.config["optim"]["batch_size"] * self.config["gpus"])
