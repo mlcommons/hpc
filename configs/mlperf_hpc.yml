@@ -17,6 +17,8 @@ task:
     mlperf_division: closed
     mlperf_status: onprem
     mlperf_platform: SUBMISSION_PLATFORM_PLACEHOLDER
+    mlperf_accelerators_per_node: 8
+    mlperf_accelerators_per_rank: 1
 
     dataset: trajectory_lmdb
     description: "Regressing to energies and forces for DFT trajectories from OCP"
