@@ -58,6 +58,7 @@ def main(pargs):
     comm_rank = comm.get_rank()
     comm_local_rank = comm.get_local_rank()
     comm_size = comm.get_size()
+    comm_local_size = comm.get_local_size()
     
     # set up logging
     pargs.logging_frequency = max([pargs.logging_frequency, 1])
@@ -88,9 +89,13 @@ def main(pargs):
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
 
+    # logging of rank information
+    logger.log_event(key = "number_of_ranks", value = comm_size)
+    logger.log_event(key = "number_of_nodes", value = (comm_size // comm_local_size))
+    logger.log_event(key = "accelerators_per_node", value = comm_local_size)
+    
     # Logging hyperparameters
     logger.log_event(key = "global_batch_size", value = (pargs.local_batch_size * comm_size))
-    logger.log_event(key = "num_workers", value = comm_size)
     logger.log_event(key = "batchnorm_group_size", value = pargs.batchnorm_group_size)
     logger.log_event(key = "gradient_accumulation_frequency", value = pargs.gradient_accumulation_frequency)
     logger.log_event(key = "checkpoint", value = pargs.checkpoint)

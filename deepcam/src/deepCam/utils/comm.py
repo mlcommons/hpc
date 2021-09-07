@@ -61,6 +61,20 @@ def get_size():
     return size
 
 
+def get_local_size():
+    """
+    Gets size of shared memory group
+    """ 
+    if not (dist.is_available() and dist.is_initialized()):
+        return 1
+    if torch.cuda.is_available():
+        local_size = torch.cuda.device_count()
+    else:
+        local_size = 1
+        
+    return local_size
+
+
 def init(method, batchnorm_group_size=1):
     #get master address and port
     if method == "nccl-openmpi":
