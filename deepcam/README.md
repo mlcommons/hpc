@@ -61,7 +61,7 @@ Note that the command line arguments do not directly correspond to logging entri
 `seed` | `x > 0` | True
 `global_batch_size` | `x > 0` | `True`
 `num_workers` | `x > 0` | `True`
-`batchnorm_group_size` | `x > 1` | `False`
+`batchnorm_group_size` | `x > 0` | `False`
 `gradient_accumulation_frequency` | `x >= 1` | `True`
 `opt_name` | `x in ["Adam", "AdamW", "LAMB"]` | `True`
 `opt_lr` | `x >= 0.` | `True`
@@ -73,7 +73,7 @@ Note that the command line arguments do not directly correspond to logging entri
 `opt_max_grad_norm` | `x == 1.0` | `True if opt_name == "LAMB" else False`
 `scheduler_type` | `x in ["multistep", "cosine_annealing"]` | `True`
 `scheduler_milestones` | unconstrained | `True if scheduler_type == "multistep" else False`
-`scheduler_decay_rate` | `x >= 1.` | `True if scheduler_type == "multistep" else False`
+`scheduler_decay_rate` | `x <= 1.` | `True if scheduler_type == "multistep" else False`
 `scheduler_t_max` | `x >= 0` | `True if scheduler_type == "cosine_annealing" else False`
 `scheduler_eta_min` | `x >= 0.` | `True if scheduler_type == "cosine_annealing" else False`
 `scheduler_lr_warmup_steps` | `x >= 0` | `False`

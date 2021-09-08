@@ -1,0 +1,98 @@
+# General Settings
+- KEY:
+    NAME:  seed
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] > 0"
+
+- KEY:
+    NAME:  global_batch_size
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] > 0"
+    
+- KEY:
+    NAME:  num_workers
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] > 0"
+
+- KEY:
+    NAME:  batchnorm_group_size
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] > 0"
+
+- KEY:
+    NAME:  gradient_accumulation_frequency
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] > 0"
+
+
+# Optimizer Parameters
+- KEY:
+    NAME:  opt_name
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] in ['Adam', 'AdamW']"
+    POST:  " s['opt_name'] = v['value'] "
+
+- KEY:
+    NAME:  opt_lr
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] >0."
+
+- KEY:
+    NAME:  opt_betas
+    REQ:   EXACTLY_ONE
+    CHECK: " len(v['value']) == 2"
+
+- KEY:
+    NAME:  opt_eps
+    REQ:   EXACTLY_ONE
+    CHECK: " math.isclose(v['value'], 1e-6)"
+
+
+# Scheduler Parameters
+- KEY:
+    NAME:  scheduler_type
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] in ['multistep', 'cosine_annealing']"
+    POST:  " s['scheduler_type'] = v['value'] "
+
+- KEY:
+    NAME:  scheduler_milestones
+    REQ:   AT_LEAST_ONE_OR(scheduler_t_max)
+    CHECK: " len(v['value']) >= 0 if s['scheduler_type'] == 'multistep' else True "
+
+- KEY:
+    NAME:  scheduler_decay_rate
+    REQ:   AT_LEAST_ONE_OR(scheduler_t_max)
+    CHECK: " v['value'] <= 1. if s['scheduler_type'] == 'multistep' else True "
+
+- KEY:
+    NAME:  scheduler_t_max
+    REQ:   AT_LEAST_ONE_OR(scheduler_milestones)
+    CHECK: " v['value'] >= 1. if s['scheduler_type'] == 'cosine_annealing' else True "
+
+- kEY:
+    NAME:  scheduler_eta_min
+    REQ:   AT_LEAST_ONE_OR(scheduler_milestones)
+    CHECK: " v['value'] >= 0. if s['scheduler_type'] == 'cosine_annealing' else True "
+
+- KEY:
+    NAME:  scheduler_lr_warmup_steps
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] >= 0 "
+
+- KEY:
+    NAME:  scheduler_lr_warmup_factor
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] >= 1. "
+
+# Dataset Properties
+- KEY:
+    NAME:  train_samples
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] == 121266"
+
+- KEY:
+    NAME:  eval_samples
+    REQ:   EXACTLY_ONE
+    CHECK: " v['value'] == 15158"
+
