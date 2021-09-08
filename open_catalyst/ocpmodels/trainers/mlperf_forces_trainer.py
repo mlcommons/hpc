@@ -364,6 +364,7 @@ class MLPerfForcesTrainer(BaseTrainer):
             mllogger.event(key='accelerators_per_node', value=accelerators_per_node)
 
             # Log hyperparameters
+            mllogger.event(key=mllog.constants.SEED, value=self.config["cmd"]["seed"])
             mllogger.event(key=mllog.constants.GLOBAL_BATCH_SIZE,
                            value=self.config["optim"]["batch_size"] * self.config["gpus"])
             mllogger.event(key=mllog.constants.TRAIN_SAMPLES, value=len(self.train_loader.dataset))
