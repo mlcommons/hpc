@@ -52,19 +52,17 @@ optim:
     batch_size: 8
     eval_batch_size: 8
     num_workers: 8
-    # Evaluate every epoch
-    #eval_every: -1000
-    lr_initial: 0.0004
-    lr_gamma: 0.1
 
-    # New LR schedule based on DistributedSampler partitioning
+    optimizer: AdamW
+    lr_initial: 0.0004
+    warmup_steps: 31252 # 4 epochs
+    warmup_factor: 0.2
     lr_milestones:
         - 125008 # 16 epochs
         - 187512 # 24 epochs
         - 250016 # 32 epochs
-    warmup_steps: 31252 # 4 epochs
+    lr_gamma: 0.1
 
-    warmup_factor: 0.2
     max_epochs: 30
     energy_coefficient: 0
     force_coefficient: 50
