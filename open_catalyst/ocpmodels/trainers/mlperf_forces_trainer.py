@@ -369,6 +369,7 @@ class MLPerfForcesTrainer(BaseTrainer):
                            value=self.config["optim"]["batch_size"] * self.config["gpus"])
             mllogger.event(key=mllog.constants.TRAIN_SAMPLES, value=len(self.train_loader.dataset))
             mllogger.event(key=mllog.constants.EVAL_SAMPLES, value=len(self.val_loader.dataset))
+            mllogger.event(key=mllog.constants.OPT_NAME, value=self.config["optim"].get("optimizer", "AdamW"))
             mllogger.event(key=mllog.constants.OPT_BASE_LR, value=self.config["optim"]["lr_initial"])
             mllogger.event(key=mllog.constants.OPT_LR_WARMUP_STEPS, value=self.config["optim"]["warmup_steps"])
             mllogger.event(key=mllog.constants.OPT_LR_WARMUP_FACTOR, value=self.config["optim"]["warmup_factor"])
