@@ -96,6 +96,7 @@ def main(pargs):
     
     # Logging hyperparameters
     logger.log_event(key = "global_batch_size", value = (pargs.local_batch_size * comm_size))
+    logger.log_event(key = "num_workers", value = comm_size)
     logger.log_event(key = "batchnorm_group_size", value = pargs.batchnorm_group_size)
     logger.log_event(key = "gradient_accumulation_frequency", value = pargs.gradient_accumulation_frequency)
     logger.log_event(key = "checkpoint", value = pargs.checkpoint)
