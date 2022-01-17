@@ -19,7 +19,7 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-FROM nvcr.io/nvidia/pytorch:21.04-py3
+FROM nvcr.io/nvidia/pytorch:21.12-py3
 
 # some requirements
 RUN pip install h5py==3.2.1
@@ -29,9 +29,6 @@ RUN pip install mpi4py==3.0.3
 
 #install mlperf logging
 RUN pip install "git+https://github.com/mlperf/logging.git@501bbde47f005d67c6357da6e5c1931eab339f8e"
-
-#install gradual warmup
-RUN pip install "git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git@6b5e8953a80aef5b324104dc0c2e9b8c34d622bd"
 
 #copy additional stuff
 COPY src/deepCam /opt/deepCam
