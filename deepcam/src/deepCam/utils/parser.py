@@ -42,7 +42,7 @@ def parse_arguments():
     AP.add_argument("--max_epochs", type=int, default=30, help="Maximum number of epochs to train")
     AP.add_argument("--save_frequency", type=int, default=0, help="Frequency in number of epochs with which the model is saved")
     AP.add_argument("--gradient_accumulation_frequency", type=int, default=1, help="Number of gradient accumulation steps before update")
-    AP.add_argument("--logging_frequency", type=int, default=100, help="Frequency in number of steps with which the training progress is logged. If not positive, logging will be disabled")
+    AP.add_argument("--logging_frequency", type=int, default=0, help="Frequency in number of steps with which the training progress is logged. If not strictly positive, logging will be performed once after each epoch")
     AP.add_argument("--local_batch_size", type=int, default=1, help="Number of samples per local minibatch")
     AP.add_argument("--channels", type=int, nargs='+', default=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], help="Channels used in input")
     AP.add_argument("--optimizer", type=str, default="Adam", choices=["Adam", "AdamW", "LAMB"], help="Optimizer to use (LAMB requires APEX support).")
