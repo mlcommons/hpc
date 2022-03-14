@@ -24,29 +24,24 @@ import numpy as np
 import torch
 import torch.optim as optim
 
+# import warmup schedulers:
+from .schedulers import MultiStepLRWarmup, CosineAnnealingLRWarmup 
+
 try:
     import apex.optimizers as aoptim
     have_apex = True
 except ImportError:
     print("NVIDIA APEX not found")
     have_apex = False
+    
 
-#warmup scheduler
-have_warmup_scheduler = False
-try:
-    from warmup_scheduler import GradualWarmupScheduler
-    have_warmup_scheduler = True
-except ImportError:
-    pass 
-    
-    
 def get_lr_schedule(start_lr, scheduler_arg, optimizer, logger, last_step = -1):
     #add the initial_lr to the optimizer
     for pgroup in optimizer.param_groups:
         pgroup["initial_lr"] = start_lr
 
     # after-scheduler
-    scheduler_after = None
+    scheduler = None
     
     #now check
     if scheduler_arg["type"] == "multistep":
@@ -55,7 +50,18 @@ def get_lr_schedule(start_lr, scheduler_arg, optimizer, logger, last_step = -1):
         gamma = float(scheduler_arg["decay_rate"])
         
         # create scheduler
-        scheduler_after = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma = gamma, last_epoch = last_step)
+        if (scheduler_arg["lr_warmup_steps"] > 0):
+            scheduler = MultiStepLRWarmup(optimizer,
+                                          warmup_steps = scheduler_arg["lr_warmup_steps"],
+                                          warmup_factor = scheduler_arg["lr_warmup_factor"],
+                                          milestones = milestones,
+                                          gamma = gamma,
+                                          last_epoch = last_step)
+        else:
+            scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
+                                                       milestones = milestones,
+                                                       gamma = gamma,
+                                                       last_epoch = last_step)
 
         # save back the parameters for better logging
         scheduler_arg["milestones"] = milestones
@@ -67,7 +73,17 @@ def get_lr_schedule(start_lr, scheduler_arg, optimizer, logger, last_step = -1):
         eta_min = 0. if "eta_min" not in scheduler_arg else float(scheduler_arg["eta_min"])
 
         # create scheduler
-        scheduler_after =  optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = t_max, eta_min = eta_min)
+        if (scheduler_arg["lr_warmup_steps"] > 0):
+            scheduler = CosineAnnealingLRWarmup(optimizer,
+                                                warmup_steps = scheduler_arg["lr_warmup_steps"],
+                                                warmup_factor = scheduler_arg["lr_warmup_factor"],
+                                                T_max = t_max,
+                                                eta_min = eta_min,
+                                                last_epoch = last_step)
+        else:
+            scheduler =  optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                              T_max = t_max,
+                                                              eta_min = eta_min)
 
         # save back the parameters for better logging
         scheduler_arg["t_max"] = t_max
@@ -75,21 +91,6 @@ def get_lr_schedule(start_lr, scheduler_arg, optimizer, logger, last_step = -1):
     
     else:
         raise ValueError("Error, scheduler type {} not supported.".format(scheduler_arg["type"]))
-
-    # LR warmup
-    if scheduler_arg["lr_warmup_steps"] > 0:
-        if have_warmup_scheduler:
-            scheduler = GradualWarmupScheduler(optimizer, multiplier=scheduler_arg["lr_warmup_factor"],
-                                               total_epoch=scheduler_arg["lr_warmup_steps"],
-                                               after_scheduler=scheduler_after)
-            
-        # Throw an error if the package is not found
-        else:
-            raise Exception(f'Requested {pargs.lr_warmup_steps} LR warmup steps '
-                            'but warmup scheduler not found. Install it from '
-                            'https://github.com/ildoonet/pytorch-gradual-warmup-lr')
-    else:
-        scheduler = scheduler_after
 
     # log scheduler data
     for key in scheduler_arg:

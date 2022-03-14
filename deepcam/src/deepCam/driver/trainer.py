@@ -30,12 +30,12 @@ import torch.distributed as dist
 from utils import metric
 
 
-def train_step(pargs, comm_rank, comm_size,
-               device, step, epoch, 
-               net, criterion, 
-               optimizer, scheduler,
-               train_loader,
-               logger):
+def train_epoch(pargs, comm_rank, comm_size,
+                device, step, epoch, 
+                net, criterion, 
+                optimizer, scheduler,
+                train_loader,
+                logger):
 
     # make sure net is set to train
     net.train()
@@ -74,7 +74,7 @@ def train_step(pargs, comm_rank, comm_size,
         step += 1
         
         #log if requested
-        if (step % pargs.logging_frequency == 0):
+        if (pargs.logging_frequency > 0) and (step % pargs.logging_frequency == 0):
     
             # allreduce for loss
             loss_avg = loss.detach()
@@ -94,5 +94,25 @@ def train_step(pargs, comm_rank, comm_size,
             logger.log_event(key = "learning_rate", value = current_lr, metadata = {'epoch_num': epoch+1, 'step_num': step})
             logger.log_event(key = "train_accuracy", value = iou_avg_train, metadata = {'epoch_num': epoch+1, 'step_num': step})
             logger.log_event(key = "train_loss", value = loss_avg_train, metadata = {'epoch_num': epoch+1, 'step_num': step})
-            
+
+    # end of epoch logging
+    # allreduce for loss
+    loss_avg = loss.detach()
+    if dist.is_initialized():
+        dist.reduce(loss_avg, dst=0, op=dist.ReduceOp.SUM)
+    loss_avg_train = loss_avg.item() / float(comm_size)
+
+    # Compute score
+    predictions = torch.argmax(torch.softmax(outputs, 1), 1)
+    iou = metric.compute_score(predictions, label, num_classes=3)
+    iou_avg = iou.detach()
+    if dist.is_initialized():
+        dist.reduce(iou_avg, dst=0, op=dist.ReduceOp.SUM)
+    iou_avg_train = iou_avg.item() / float(comm_size)
+        
+    # log values
+    logger.log_event(key = "learning_rate", value = current_lr, metadata = {'epoch_num': epoch+1, 'step_num': step})
+    logger.log_event(key = "train_accuracy", value = iou_avg_train, metadata = {'epoch_num': epoch+1, 'step_num': step})
+    logger.log_event(key = "train_loss", value = loss_avg_train, metadata = {'epoch_num': epoch+1, 'step_num': step}) 
+    
     return step

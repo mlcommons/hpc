@@ -35,7 +35,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 # Custom
-from driver import train_step, validate
+from driver import train_epoch, validate
 from utils import parser
 from utils import losses
 from utils import optimizer_helpers as oh
@@ -61,7 +61,7 @@ def main(pargs):
     comm_local_size = comm.get_local_size()
     
     # set up logging
-    pargs.logging_frequency = max([pargs.logging_frequency, 1])
+    pargs.logging_frequency = max([pargs.logging_frequency, 0])
     log_file = os.path.normpath(os.path.join(pargs.output_dir, "logs", pargs.run_tag + ".log"))
     logger = mll.mlperf_logger(log_file, "deepcam", "Umbrella Corp.")
     logger.log_start(key = "init_start", sync = True)        
@@ -206,12 +206,12 @@ def main(pargs):
         train_loader.sampler.set_epoch(epoch)
 
         # training
-        step = train_step(pargs, comm_rank, comm_size,
-                          device, step, epoch, 
-                          net_train, criterion, 
-                          optimizer, scheduler,
-                          train_loader,
-                          logger)
+        step = train_epoch(pargs, comm_rank, comm_size,
+                           device, step, epoch, 
+                           net_train, criterion, 
+                           optimizer, scheduler,
+                           train_loader,
+                           logger)
 
         # average BN stats
         bnstats_handler.synchronize()
