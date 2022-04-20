@@ -11,6 +11,7 @@ class MultiStepLRWarmup(_LRScheduler):
         
         self.warmup_steps = warmup_steps
         self.warmup_factor = warmup_factor
+        self.warmup_slope = 1./float(self.warmup_steps) if self.warmup_steps > 0 else 1.
         self.milestones = Counter([x + self.warmup_steps + 1 for x in milestones])
         self.gamma = gamma
         super(MultiStepLRWarmup, self).__init__(optimizer, last_epoch, verbose)
@@ -22,7 +23,7 @@ class MultiStepLRWarmup(_LRScheduler):
                           "please use `get_last_lr()`.", UserWarning)
 
         # compute LR
-        if self.last_epoch > self.warmup_steps:
+        if self.last_epoch >= self.warmup_steps:
             # decay phase
             if self.last_epoch not in self.milestones:
                 return [group['lr'] for group in self.optimizer.param_groups]
@@ -32,10 +33,10 @@ class MultiStepLRWarmup(_LRScheduler):
         else:
             # linear warmup phase
             if self.warmup_factor == 1.0:
-                return [base_lr * (float(self.last_epoch) / self.warmup_steps)
+                return [base_lr * (float(self.last_epoch) * self.warmup_slope)
                         for base_lr in self.base_lrs]
             else:
-                return [base_lr * ((self.multiplier - 1.) * float(self.last_epoch) / self.warmup_steps + 1.)
+                return [base_lr * ((self.warmup_factor - 1.) * float(self.last_epoch) * self.warmup_slope + 1.)
                         for base_lr in self.base_lrs]
 
 
@@ -48,6 +49,7 @@ class CosineAnnealingLRWarmup(_LRScheduler):
         
         self.warmup_steps = warmup_steps
         self.warmup_factor = warmup_factor
+        self.warmup_slope = 1./float(self.warmup_steps) if self.warmup_steps > 0 else 1.
         self.T_max = T_max
         self.eta_min = eta_min
         super(CosineAnnealingLRWarmup, self).__init__(optimizer, last_epoch, verbose)
@@ -59,7 +61,7 @@ class CosineAnnealingLRWarmup(_LRScheduler):
                           "please use `get_last_lr()`.", UserWarning)
 
         # compute LR
-        if self.last_epoch > self.warmup_steps:
+        if self.last_epoch >= self.warmup_steps:
             # cosine phase
             last_epoch_eff = self.last_epoch - self.warmup_steps
             if last_epoch_eff == 0:
@@ -77,8 +79,8 @@ class CosineAnnealingLRWarmup(_LRScheduler):
         else:
             # linear warmup phase
             if self.warmup_factor == 1.0:
-                return [base_lr * (float(self.last_epoch) / self.warmup_steps)
+                return [base_lr * (float(self.last_epoch) * self.warmup_slope)
                         for base_lr in self.base_lrs]
             else:
-                return [base_lr * ((self.multiplier - 1.) * float(self.last_epoch) / self.warmup_steps + 1.)
+                return [base_lr * ((self.warmup_factor - 1.) * float(self.last_epoch) * self.warmup_slope + 1.)
                         for base_lr in self.base_lrs]
