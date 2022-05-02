@@ -111,9 +111,9 @@ def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
 
     # Define the dataset from the list of sharded, shuffled files
     data = tf.data.Dataset.from_tensor_slices(filenames)
-    data = data.shard(num_shards=n_shards, index=shard)
     if shuffle:
         data = data.shuffle(len(filenames), reshuffle_each_iteration=True)
+    data = data.shard(num_shards=n_shards, index=shard)
 
     # Parse TFRecords
     parse_data = partial(_parse_data, shape=sample_shape, apply_log=apply_log)

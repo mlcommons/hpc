@@ -118,14 +118,11 @@ def parse_args():
     add_arg('--amp', action='store_true', help='Enable automatic mixed precision')
 
     # Other settings
-    add_arg('--mlperf', action='store_true',
-            help='Enable MLPerf logging')
-    add_arg('--wandb', action='store_true',
-            help='Enable W&B logging')
-    add_arg('--tensorboard', action='store_true',
-            help='Enable TB logger')
-    add_arg('--print-fom', action='store_true',
-            help='Print parsable figure of merit')
+    add_arg('--seed', type=int, default=0, help='Specify the random seed')
+    add_arg('--mlperf', action='store_true', help='Enable MLPerf logging')
+    add_arg('--wandb', action='store_true', help='Enable W&B logging')
+    add_arg('--tensorboard', action='store_true', help='Enable TB logger')
+    add_arg('--print-fom', action='store_true', help='Print parsable figure of merit')
     add_arg('-v', '--verbose', action='store_true')
     return parser.parse_args()
 
@@ -226,6 +223,10 @@ def main():
                  dist.rank, dist.size, dist.local_rank, dist.local_size)
     if dist.rank == 0:
         logging.info('Configuration: %s', config)
+
+    # Random seeding
+    tf.random.set_seed(args.seed)
+    np.random.seed(args.seed)
 
     # Setup MLPerf logging
     if args.mlperf:
