@@ -39,6 +39,7 @@ except ImportError:
 
 from .layers import scale_1p2
 
+
 def build_model(input_shape, target_size,
                 conv_size=32, kernel_size=3, n_conv_layers=5,
                 fc1_size=128, fc2_size=64, l2=0,

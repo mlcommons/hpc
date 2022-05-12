@@ -47,6 +47,7 @@ except ImportError:
 import utils.distributed
 from utils.staging import stage_files
 
+
 def _parse_data(sample_proto, shape, apply_log=False):
     """Parse the data out of the TFRecord proto buf.
 
@@ -74,6 +75,7 @@ def _parse_data(sample_proto, shape, apply_log=False):
         x /= (tf.reduce_sum(x) / np.prod(shape))
 
     return x, y
+
 
 def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
                       sample_shape, samples_per_file=1, n_file_sets=1,
@@ -138,6 +140,7 @@ def construct_dataset(file_dir, n_samples, batch_size, n_epochs,
 
     # Prefetch to device
     return data.prefetch(prefetch), n_steps
+
 
 def get_datasets(data_dir, sample_shape, n_train, n_valid,
                  batch_size, n_epochs, dist, samples_per_file=1,

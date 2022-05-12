@@ -32,6 +32,7 @@ import os
 import shutil
 import logging
 
+
 def stage_files(input_dir, output_dir, n_files, rank=0, size=1):
     """Stage specified number of files to directory.
 

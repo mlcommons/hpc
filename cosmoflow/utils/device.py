@@ -40,6 +40,7 @@ import tensorflow as tf
 # Locals
 import utils.distributed as dist
 
+
 def configure_session(gpu=None, intra_threads=None, inter_threads=None,
                       kmp_blocktime=None, kmp_affinity=None, omp_num_threads=None):
     """Sets the thread knobs in the TF backend"""
