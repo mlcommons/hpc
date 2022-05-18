@@ -382,9 +382,9 @@ def main():
         print_training_summary(config['output_dir'], args.print_fom)
 
     # Print GPU memory
-    if gpu is not None:
-        gpu_mem_info = tf.config.experimental.get_memory_info(f'GPU:{gpu}')
-        logging.info('Peak GPU memory: %.2f GB', gpu_mem_info['peak'] / 1024 / 1024 / 1024)
+    #if gpu is not None:
+    #    gpu_mem_info = tf.config.experimental.get_memory_info(f'GPU:{gpu}')
+    #    logging.info('Peak GPU memory: %.2f GB', gpu_mem_info['peak'] / 1024 / 1024 / 1024)
 
     # Finalize
     if dist.rank == 0:
