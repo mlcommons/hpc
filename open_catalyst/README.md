@@ -33,6 +33,8 @@ ocp-models is the modeling codebase for the [Open Catalyst Project](https://open
 It provides implementations of state-of-the-art ML algorithms for catalysis that
 take arbitrary chemical structures as input to predict energy / forces / positions:
 
+- [GemNet](https://arxiv.org/abs/2106.08903)
+- [SpinConv](https://arxiv.org/abs/2106.09575)
 - [DimeNet++](https://arxiv.org/abs/2011.14115)
 - [ForceNet](https://arxiv.org/abs/2103.01436)
 - [DimeNet](https://arxiv.org/abs/2003.03123)
@@ -93,6 +95,18 @@ Please skip the following if you completed the with-GPU installation from above.
 conda-merge env.common.yml env.cpu.yml > env.yml
 conda env create -f env.yml
 conda activate ocp-models
+pip install -e .
+pre-commit install
+```
+
+### Mac CPU-only machines
+
+Only run the following if installing on a CPU only machine running Mac OS X.
+
+```
+conda env create -f env.common.yml
+conda activate ocp-models
+MACOSX_DEPLOYMENT_TARGET=10.9 CC=clang CXX=clang++ pip install torch-cluster torch-scatter torch-sparse torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
 pip install -e .
 pre-commit install
 ```
