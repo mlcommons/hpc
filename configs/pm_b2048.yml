@@ -1,0 +1,69 @@
+trainer: mlperf_forces
+
+dataset:
+    - src: /pscratch/sd/s/sfarrell/ocp/data/s2ef/2M/train
+      normalize_labels: True
+      target_mean: -0.7554450631141663
+      target_std: 2.887317180633545
+      grad_target_mean: 0.0
+      grad_target_std: 2.887317180633545
+    - src: /pscratch/sd/s/sfarrell/ocp/data/s2ef/all/val_id
+
+logger: wandb
+
+task:
+    mlperf_benchmark: oc20
+    mlperf_org: LBNL
+    mlperf_division: closed
+    mlperf_status: onprem
+    mlperf_platform: SUBMISSION_PLATFORM_PLACEHOLDER
+    mlperf_accelerators_per_node: 4
+    mlperf_accelerators_per_rank: 1
+
+    dataset: trajectory_lmdb
+    description: "Regressing to energies and forces for DFT trajectories from OCP"
+    type: regression
+    metric: mae
+    primary_metric: forces_mae
+    target_forces_mae: 0.036
+    labels:
+        - potential energy
+    grad_input: atomic forces
+    train_on_free_atoms: True
+    eval_on_free_atoms: True
+
+model:
+    name: dimenetplusplus
+    hidden_channels: 192
+    out_emb_channels: 192
+    num_blocks: 3
+    cutoff: 6.0
+    num_radial: 6
+    num_spherical: 7
+    num_before_skip: 1
+    num_after_skip: 2
+    num_output_layers: 3
+    regress_forces: True
+    use_pbc: True
+    #otf_graph: True
+
+# These settings optimized for global batch size (batch_size * gpus) = 2048
+optim:
+    batch_size: 4
+    eval_batch_size: 8
+    num_workers: 8
+
+    optimizer: AdamW
+    lr_initial: 0.0016
+    warmup_steps: 3908 # 4 epochs
+    warmup_factor: 0.2
+    lr_milestones:
+        - 23448 # 24 epochs
+        - 31264 # 32 epochs
+    lr_gamma: 0.1
+
+    max_epochs: 48
+    energy_coefficient: 0
+    force_coefficient: 50
+
+hide_eval_progressbar: True

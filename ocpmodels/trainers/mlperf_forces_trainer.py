@@ -5,12 +5,16 @@ This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 """
 
+import time
+import logging
 import os
 from collections import defaultdict
 
 import numpy as np
 import torch
 import torch_geometric
+from tqdm import tqdm
+
 from ocpmodels.common import distutils
 from ocpmodels.common.data_parallel import ParallelCollater
 from ocpmodels.common.registry import registry
@@ -20,9 +24,9 @@ from ocpmodels.modules.evaluator import Evaluator
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.trainers.base_trainer import BaseTrainer
 from torch.utils.data import DataLoader, DistributedSampler
-from tqdm import tqdm
 
 from mlperf_logging import mllog
+
 
 @registry.register_trainer("mlperf_forces")
 class MLPerfForcesTrainer(BaseTrainer):
@@ -60,6 +64,8 @@ class MLPerfForcesTrainer(BaseTrainer):
             (default: :obj:`0`)
         amp (bool, optional): Run using automatic mixed precision.
             (default: :obj:`False`)
+        slurm (dict): Slurm configuration. Currently just for keeping track.
+            (default: :obj:`{}`)
     """
 
     def __init__(
@@ -69,6 +75,8 @@ class MLPerfForcesTrainer(BaseTrainer):
         dataset,
         optimizer,
         identifier,
+        normalizer=None,
+        timestamp_id=None,
         run_dir=None,
         is_debug=False,
         is_vis=False,
@@ -79,6 +87,7 @@ class MLPerfForcesTrainer(BaseTrainer):
         local_rank=0,
         amp=False,
         cpu=False,
+        slurm={},
     ):
         super().__init__(
             task=task,
@@ -86,6 +95,8 @@ class MLPerfForcesTrainer(BaseTrainer):
             dataset=dataset,
             optimizer=optimizer,
             identifier=identifier,
+            normalizer=normalizer,
+            timestamp_id=timestamp_id,
             run_dir=run_dir,
             is_debug=is_debug,
             is_vis=is_vis,
@@ -97,40 +108,40 @@ class MLPerfForcesTrainer(BaseTrainer):
             amp=amp,
             cpu=cpu,
             name="s2ef",
+            slurm=slurm,
         )
 
     def load_task(self):
-        print("### Loading dataset: {}".format(self.config["task"]["dataset"]))
+        logging.info(f"Loading dataset: {self.config['task']['dataset']}")
 
         self.parallel_collater = ParallelCollater(
-            1 if not self.cpu else 0,
+            0 if self.cpu else 1,
             self.config["model_attributes"].get("otf_graph", False),
         )
         if self.config["task"]["dataset"] == "trajectory_lmdb":
-            self.train_dataset = registry.get_dataset_class(
-                self.config["task"]["dataset"]
-            )(self.config["dataset"])
+            self.train_loader = self.val_loader = self.test_loader = None
+            if self.config.get("dataset", None):
+                self.train_dataset = registry.get_dataset_class(
+                    self.config["task"]["dataset"]
+                )(self.config["dataset"])
 
-            self.train_sampler = DistributedSampler(
-                self.train_dataset,
-                num_replicas=distutils.get_world_size(),
-                rank=distutils.get_rank(),
-                shuffle=True,
-            )
+                self.train_sampler = DistributedSampler(
+                    self.train_dataset,
+                    num_replicas=distutils.get_world_size(),
+                    rank=distutils.get_rank(),
+                    shuffle=True,
+                )
 
-            self.train_loader = DataLoader(
-                self.train_dataset,
-                batch_size=self.config["optim"]["batch_size"],
-                collate_fn=self.parallel_collater,
-                num_workers=self.config["optim"]["num_workers"],
-                pin_memory=True,
-                sampler=self.train_sampler,
-            )
+                self.train_loader = DataLoader(
+                    self.train_dataset,
+                    batch_size=self.config["optim"]["batch_size"],
+                    collate_fn=self.parallel_collater,
+                    num_workers=self.config["optim"]["num_workers"],
+                    pin_memory=True,
+                    sampler=self.train_sampler,
+                )
 
-            self.val_loader = self.test_loader = None
-            self.val_sampler = self.test_sampler = None
-
-            if "val_dataset" in self.config:
+            if self.config.get("val_dataset", None):
                 self.val_dataset = registry.get_dataset_class(
                     self.config["task"]["dataset"]
                 )(self.config["val_dataset"])
@@ -148,7 +159,7 @@ class MLPerfForcesTrainer(BaseTrainer):
                     pin_memory=True,
                     sampler=self.val_sampler,
                 )
-            if "test_dataset" in self.config:
+            if self.config.get("test_dataset", None):
                 self.test_dataset = registry.get_dataset_class(
                     self.config["task"]["dataset"]
                 )(self.config["test_dataset"])
@@ -166,6 +177,7 @@ class MLPerfForcesTrainer(BaseTrainer):
                     pin_memory=True,
                     sampler=self.test_sampler,
                 )
+
         else:
             raise ValueError("Only trajectory_lmdb dataset supported")
 
@@ -174,11 +186,11 @@ class MLPerfForcesTrainer(BaseTrainer):
         # Normalizer for the dataset.
         # Compute mean, std of training set labels.
         self.normalizers = {}
-        if self.config["dataset"].get("normalize_labels", False):
-            if "target_mean" in self.config["dataset"]:
+        if self.normalizer.get("normalize_labels", False):
+            if "target_mean" in self.normalizer:
                 self.normalizers["target"] = Normalizer(
-                    mean=self.config["dataset"]["target_mean"],
-                    std=self.config["dataset"]["target_std"],
+                    mean=self.normalizer["target_mean"],
+                    std=self.normalizer["target_std"],
                     device=self.device,
                 )
             else:
@@ -192,11 +204,11 @@ class MLPerfForcesTrainer(BaseTrainer):
         # If we're computing gradients wrt input, set mean of normalizer to 0 --
         # since it is lost when compute dy / dx -- and std to forward target std
         if self.config["model_attributes"].get("regress_forces", True):
-            if self.config["dataset"].get("normalize_labels", False):
-                if "grad_target_mean" in self.config["dataset"]:
+            if self.normalizer.get("normalize_labels", False):
+                if "grad_target_mean" in self.normalizer:
                     self.normalizers["grad_target"] = Normalizer(
-                        mean=self.config["dataset"]["grad_target_mean"],
-                        std=self.config["dataset"]["grad_target_std"],
+                        mean=self.normalizer["grad_target_mean"],
+                        std=self.normalizer["grad_target_std"],
                         device=self.device,
                     )
                 else:
@@ -239,10 +251,14 @@ class MLPerfForcesTrainer(BaseTrainer):
     # Takes in a new data source and generates predictions on it.
     @torch.no_grad()
     def predict(
-        self, data_loader, per_image=True, results_file=None, disable_tqdm=True
+        self,
+        data_loader,
+        per_image=True,
+        results_file=None,
+        disable_tqdm=False,
     ):
         if distutils.is_master() and not disable_tqdm:
-            print("### Predicting on test.")
+            logging.info("Predicting on test.")
         assert isinstance(
             data_loader,
             (
@@ -333,7 +349,30 @@ class MLPerfForcesTrainer(BaseTrainer):
         )
         return predictions
 
-    def train(self):
+    def update_best(
+        self,
+        primary_metric,
+        val_metrics,
+        disable_eval_tqdm=True,
+    ):
+        if (
+            "mae" in primary_metric
+            and val_metrics[primary_metric]["metric"] < self.best_val_metric
+        ) or (val_metrics[primary_metric]["metric"] > self.best_val_metric):
+            self.best_val_metric = val_metrics[primary_metric]["metric"]
+            self.save(
+                metrics=val_metrics,
+                checkpoint_file="best_checkpoint.pt",
+                training_state=False,
+            )
+            if self.test_loader is not None:
+                self.predict(
+                    self.test_loader,
+                    results_file="predictions",
+                    disable_tqdm=disable_eval_tqdm,
+                )
+
+    def train(self, disable_eval_tqdm=False):
 
         # Configure mlperf logging
         mlperf_logfile = os.path.join(
@@ -369,7 +408,11 @@ class MLPerfForcesTrainer(BaseTrainer):
                            value=self.config["optim"]["batch_size"] * self.config["gpus"])
             mllogger.event(key=mllog.constants.TRAIN_SAMPLES, value=len(self.train_loader.dataset))
             mllogger.event(key=mllog.constants.EVAL_SAMPLES, value=len(self.val_loader.dataset))
-            mllogger.event(key=mllog.constants.OPT_NAME, value=self.config["optim"].get("optimizer", "AdamW"))
+            opt_name = self.config["optim"].get("optimizer", "AdamW")
+            # Apex FusedAdam is AdamW by default
+            if opt_name == "FusedAdam":
+                opt_name = "AdamW"
+            mllogger.event(key=mllog.constants.OPT_NAME, value=opt_name)
             mllogger.event(key=mllog.constants.OPT_BASE_LR, value=self.config["optim"]["lr_initial"])
             mllogger.event(key=mllog.constants.OPT_LR_WARMUP_STEPS, value=self.config["optim"]["warmup_steps"])
             mllogger.event(key=mllog.constants.OPT_LR_WARMUP_FACTOR, value=self.config["optim"]["warmup_factor"])
@@ -383,36 +426,40 @@ class MLPerfForcesTrainer(BaseTrainer):
         eval_every = self.config["optim"].get(
             "eval_every", len(self.train_loader)
         )
+        checkpoint_every = self.config["optim"].get(
+            "checkpoint_every", eval_every
+        )
         primary_metric = self.config["task"].get(
             "primary_metric", self.evaluator.task_primary_metric[self.name]
         )
         self.best_val_metric = 1e9 if "mae" in primary_metric else -1.0
-        iters = 0
         self.metrics = {}
         stop_training = False
 
-        start_epoch = self.start_step // len(self.train_loader)
-        print(
-            f"Starting epoch {start_epoch} "
-            + f"train batches {len(self.train_loader)} "
-            + f"samples {len(self.train_loader.sampler)} "
-            + f"valid batches {len(self.val_loader)} "
-            + f"samples {len(self.val_loader.sampler)}"
-        )
-        for epoch in range(start_epoch, self.config["optim"]["max_epochs"]):
+        # Calculate start_epoch from step instead of loading the epoch number
+        # to prevent inconsistencies due to different batch size in checkpoint.
+        start_epoch = self.step // len(self.train_loader)
+        print(f"Starting epoch {start_epoch} " +
+              f"train batches {len(self.train_loader)} " +
+              f"samples {len(self.train_loader.sampler)}")
+        if self.val_loader is not None:
+            print(f"valid batches {len(self.val_loader)} " +
+                  f"samples {len(self.val_loader.sampler)}")
+        for epoch_int in range(
+            start_epoch, self.config["optim"]["max_epochs"]
+        ):
             if distutils.is_master():
                 mllogger.start(key=mllog.constants.EPOCH_START,
-                               metadata={"epoch_num": epoch+1})
-            self.train_sampler.set_epoch(epoch)
-            skip_steps = 0
-            if epoch == start_epoch and start_epoch > 0:
-                skip_steps = start_epoch % len(self.train_loader)
+                               metadata={"epoch_num": epoch_int+1})
+            self.train_sampler.set_epoch(epoch_int)
+            skip_steps = self.step % len(self.train_loader)
             train_loader_iter = iter(self.train_loader)
 
             for i in range(skip_steps, len(self.train_loader)):
+                step_time_start = time.time()
+                self.epoch = epoch_int + (i + 1) / len(self.train_loader)
+                self.step = epoch_int * len(self.train_loader) + i + 1
                 self.model.train()
-                current_epoch = epoch + (i + 1) / len(self.train_loader)
-                current_step = epoch * len(self.train_loader) + (i + 1)
 
                 # Get a batch.
                 batch = next(train_loader_iter)
@@ -441,72 +488,62 @@ class MLPerfForcesTrainer(BaseTrainer):
                 log_dict.update(
                     {
                         "lr": self.scheduler.get_lr(),
-                        "epoch": current_epoch,
-                        "step": current_step,
+                        "epoch": self.epoch,
+                        "step": self.step,
+                        "step_time": time.time() - step_time_start,
                     }
                 )
                 if (
-                    current_step % self.config["cmd"]["print_every"] == 0
+                    self.step % self.config["cmd"]["print_every"] == 0
                     and distutils.is_master()
                     and not self.is_hpo
                 ):
                     log_str = [
                         "{}: {:.2e}".format(k, v) for k, v in log_dict.items()
                     ]
-                    print(", ".join(log_str))
+                    logging.info(", ".join(log_str))
                     self.metrics = {}
 
                 if self.logger is not None:
                     self.logger.log(
                         log_dict,
-                        step=current_step,
+                        step=self.step,
                         split="train",
                     )
 
-                iters += 1
+                if (
+                    checkpoint_every != -1
+                    and self.step % checkpoint_every == 0
+                ):
+                    self.save(
+                        checkpoint_file="checkpoint.pt", training_state=True
+                    )
 
                 # Evaluate on val set every `eval_every` iterations.
-                if iters % eval_every == 0:
+                if self.step % eval_every == 0:
                     if self.val_loader is not None:
                         if distutils.is_master():
                             mllogger.start(key=mllog.constants.EVAL_START,
-                                           metadata={"epoch_num": epoch+1})
+                                           metadata={"epoch_num": epoch_int+1})
                         val_metrics = self.validate(
                             split="val",
-                            epoch=epoch - 1 + (i + 1) / len(self.train_loader),
-                            disable_tqdm=self.config["optim"].get(
-                                "disable_tqdm", False
-                            ),
+                            disable_tqdm=disable_eval_tqdm,
                         )
                         if distutils.is_master():
                             mllogger.end(key=mllog.constants.EVAL_STOP,
-                                         metadata={"epoch_num": epoch+1})
+                                         metadata={"epoch_num": epoch_int+1})
                             mllogger.event(key="eval_error",
                                            value=val_metrics["forces_mae"]["metric"],
-                                           metadata={"epoch_num": epoch+1})
-                        if (
-                            "mae" in primary_metric
-                            and val_metrics[primary_metric]["metric"]
-                            < self.best_val_metric
-                        ) or (
-                            val_metrics[primary_metric]["metric"]
-                            > self.best_val_metric
-                        ):
-                            self.best_val_metric = val_metrics[primary_metric][
-                                "metric"
-                            ]
-                            self.save(current_epoch, current_step, val_metrics)
-                            if self.test_loader is not None:
-                                self.predict(
-                                    self.test_loader,
-                                    results_file="predictions",
-                                    disable_tqdm=False,
-                                )
-
+                                           metadata={"epoch_num": epoch_int+1})
+                        self.update_best(
+                            primary_metric,
+                            val_metrics,
+                            disable_eval_tqdm=disable_eval_tqdm,
+                        )
                         if self.is_hpo:
                             self.hpo_update(
-                                current_epoch,
-                                current_step,
+                                self.epoch,
+                                self.step,
                                 self.metrics,
                                 val_metrics,
                             )
@@ -517,15 +554,12 @@ class MLPerfForcesTrainer(BaseTrainer):
                             and val_metrics["forces_mae"]["metric"]
                             < self.config["task"]["target_forces_mae"]
                         ):
-                            print("Target quality met. Stopping training")
+                            logging.info("Target quality met. Stopping training")
                             stop_training = True
                             break
 
-                    else:
-                        self.save(current_epoch, current_step, self.metrics)
-
                 if self.scheduler.scheduler_type == "ReduceLROnPlateau":
-                    if iters % eval_every == 0:
+                    if self.step % eval_every == 0:
                         self.scheduler.step(
                             metrics=val_metrics[primary_metric]["metric"],
                         )
@@ -533,9 +567,12 @@ class MLPerfForcesTrainer(BaseTrainer):
                     self.scheduler.step()
 
             torch.cuda.empty_cache()
+
+            if checkpoint_every == -1:
+                self.save(checkpoint_file="checkpoint.pt", training_state=True)
             if distutils.is_master():
                 mllogger.end(key=mllog.constants.EPOCH_STOP,
-                             metadata={"epoch_num": epoch+1})
+                             metadata={"epoch_num": epoch_int+1})
 
             # End training criteria
             if stop_training:
@@ -576,17 +613,19 @@ class MLPerfForcesTrainer(BaseTrainer):
         energy_target = torch.cat(
             [batch.y.to(self.device) for batch in batch_list], dim=0
         )
-        if self.config["dataset"].get("normalize_labels", False):
+        if self.normalizer.get("normalize_labels", False):
             energy_target = self.normalizers["target"].norm(energy_target)
         energy_mult = self.config["optim"].get("energy_coefficient", 1)
-        loss.append(energy_mult * self.criterion(out["energy"], energy_target))
+        loss.append(
+            energy_mult * self.loss_fn["energy"](out["energy"], energy_target)
+        )
 
         # Force loss.
         if self.config["model_attributes"].get("regress_forces", True):
             force_target = torch.cat(
                 [batch.force.to(self.device) for batch in batch_list], dim=0
             )
-            if self.config["dataset"].get("normalize_labels", False):
+            if self.normalizer.get("normalize_labels", False):
                 force_target = self.normalizers["grad_target"].norm(
                     force_target
                 )
@@ -635,14 +674,14 @@ class MLPerfForcesTrainer(BaseTrainer):
                     mask = fixed == 0
                     loss.append(
                         force_mult
-                        * self.criterion(
+                        * self.loss_fn["force"](
                             out["forces"][mask], force_target[mask]
                         )
                     )
                 else:
                     loss.append(
                         force_mult
-                        * self.criterion(out["forces"], force_target)
+                        * self.loss_fn["force"](out["forces"], force_target)
                     )
         # Sanity check to make sure the compute graph is correct.
         for lc in loss:
@@ -686,7 +725,7 @@ class MLPerfForcesTrainer(BaseTrainer):
             target["natoms"] = torch.LongTensor(natoms_free).to(self.device)
             out["natoms"] = torch.LongTensor(natoms_free).to(self.device)
 
-        if self.config["dataset"].get("normalize_labels", False):
+        if self.normalizer.get("normalize_labels", False):
             out["energy"] = self.normalizers["target"].denorm(out["energy"])
             out["forces"] = self.normalizers["grad_target"].denorm(
                 out["forces"]
@@ -695,8 +734,8 @@ class MLPerfForcesTrainer(BaseTrainer):
         metrics = evaluator.eval(out, target, prev_metrics=metrics)
         return metrics
 
-    def run_relaxations(self, split="val", epoch=None):
-        print("### Running ML-relaxations")
+    def run_relaxations(self, split="val"):
+        logging.info("Running ML-relaxations")
         self.model.eval()
 
         evaluator, metrics = Evaluator(task="is2rs"), {}
@@ -714,6 +753,9 @@ class MLPerfForcesTrainer(BaseTrainer):
         for i, batch in tqdm(
             enumerate(self.relax_loader), total=len(self.relax_loader)
         ):
+            if i >= self.config["task"].get("num_relaxations", 1e9):
+                break
+
             relaxed_batch = ml_relax(
                 batch=batch,
                 model=self,
@@ -808,7 +850,7 @@ class MLPerfForcesTrainer(BaseTrainer):
                     :-1
                 ]  # np.split does not need last idx, assumes n-1:end
 
-                print(f"Writing results to {full_path}")
+                logging.info(f"Writing results to {full_path}")
                 np.savez_compressed(full_path, **gather_results)
 
         if split == "val":
@@ -830,12 +872,12 @@ class MLPerfForcesTrainer(BaseTrainer):
 
             # Make plots.
             log_dict = {k: metrics[k]["metric"] for k in metrics}
-            if self.logger is not None and epoch is not None:
+            if self.logger is not None:
                 self.logger.log(
                     log_dict,
-                    step=(epoch + 1) * len(self.train_loader),
+                    step=self.step,
                     split=split,
                 )
 
             if distutils.is_master():
-                print(metrics)
+                logging.info(metrics)
