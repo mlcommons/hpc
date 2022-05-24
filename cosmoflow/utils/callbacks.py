@@ -41,6 +41,7 @@ try:
 except ImportError:
     have_mlperf_logging = False
 
+
 class MLPerfLoggingCallback(tf.keras.callbacks.Callback):
     """A Keras Callback for logging MLPerf results"""
     def __init__(self, metric='val_mean_absolute_error', log_key='eval_error'):
@@ -68,6 +69,7 @@ class MLPerfLoggingCallback(tf.keras.callbacks.Callback):
         self.mllogger.event(key=self.log_key, value=eval_metric,
                             metadata={'epoch_num': epoch + 1})
 
+
 class StopAtTargetCallback(tf.keras.callbacks.Callback):
     """A Keras callback for stopping training at specified target quality"""
 
@@ -80,6 +82,7 @@ class StopAtTargetCallback(tf.keras.callbacks.Callback):
         if self.target_max is not None and eval_metric <= self.target_max:
             self.model.stop_training = True
             logging.info('Target reached; stopping training')
+
 
 class TimingCallback(tf.keras.callbacks.Callback):
     """A Keras Callback which records the time of each epoch"""

@@ -45,6 +45,7 @@ except ImportError:
 # Locals
 import utils.distributed
 
+
 def _lr_schedule(epoch, base_lr, peak_lr, n_warmup_epochs, decay_schedule={}):
     """Learning rate schedule function.
 
@@ -66,6 +67,7 @@ def _lr_schedule(epoch, base_lr, peak_lr, n_warmup_epochs, decay_schedule={}):
             if e >= decay_epoch and e < epoch:
                 decay_epoch, decay_factor = e, d
         return peak_lr * decay_factor
+
 
 def get_lr_schedule(base_lr, global_batch_size, base_batch_size=None,
                     scaling=None, n_warmup_epochs=0, decay_schedule={}):
@@ -96,6 +98,7 @@ def get_lr_schedule(base_lr, global_batch_size, base_batch_size=None,
     return partial(_lr_schedule, base_lr=base_lr, peak_lr=peak_lr,
                    n_warmup_epochs=n_warmup_epochs,
                    decay_schedule=decay_schedule)
+
 
 def get_optimizer(name, distributed=False, **opt_args):
     """Configure the optimizer"""

@@ -41,12 +41,14 @@ try:
 except ImportError:
     have_mlperf_logging = False
 
+
 def configure_mllogger(log_dir):
     """Setup the MLPerf logger"""
     if not have_mlperf_logging:
         raise RuntimeError('mlperf_logging package unavailable')
     mllog.config(filename=os.path.join(log_dir, 'mlperf.log'))
     return mllog.get_mllogger()
+
 
 def log_submission_info(benchmark='cosmoflow',
                         org='UNDEFINED',

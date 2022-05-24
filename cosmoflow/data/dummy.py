@@ -29,9 +29,6 @@
 Random dummy dataset specification.
 """
 
-# System
-import math
-
 # Externals
 import tensorflow as tf
 
@@ -42,6 +39,7 @@ def construct_dataset(sample_shape, target_shape,
     y = tf.random.uniform([n_samples]+target_shape)
     data = tf.data.Dataset.from_tensor_slices((x, y))
     return data.repeat().batch(batch_size).prefetch(4)
+
 
 def get_datasets(sample_shape, target_shape, batch_size,
                  n_train, n_valid, dist, n_epochs=None, shard=False):
