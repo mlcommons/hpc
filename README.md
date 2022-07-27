@@ -14,30 +14,24 @@ The MLPerf Training rules are available at [training\_rules](https://github.com/
 The MLPerf HPC specific rules are at [hpc\_training\_rules](https://github.com/mlcommons/training_policies/blob/master/hpc_training_rules.adoc).
 
 ## Compliance
-
-**IMPORTANT NOTE:** This section needs to be updated for HPC v1.0.
-For now the referenced version of the `mlperf-logging` repository should be fine
-for logging, but the compliance checking code and results summarizer code require
-update.
-
-The MLPerf logging package implements logging and compliance-checking utilities
-for MLPerf benchmarks. We have a temporary fork and hpc-0.5.0 branch in which we
-are adding support for MLPerf-HPC v0.5 at
-https://github.com/mlperf-hpc/logging/tree/hpc-0.5.0
+The MLPerf logging package implements logging and compliance-checking utilities. This is available in hpc-1.0-branch of the MLPerf logging repository (https://github.com/mlcommons/logging/tree/hpc-1.0-branch).
+These work for the HPC v2.0 submissions as well.
 
 To install and test compliance of your runs/submissions:
+
 ```
 # Install the package into your python environment.
 # A development install (-e) is recommended for now so you can pull new updates.
-git clone -b hpc-0.5.0 https://github.com/mlperf-hpc/logging.git mlperf-logging
+git clone -b hpc-1.0-branch https://github.com/mlcommons/logging mlperf-logging
 pip install [--user] -e mlperf-logging
 
-# Test compliance of a specific mlperf hpc log file
-python -m mlperf_logging.compliance_checker --ruleset hpc_0.5.0 $logFile
-
-# Test a system description file (we just use the Training v0.7 rules)
-python -m mlperf_logging.system_desc_checker $jsonFile training 0.7.0
-
 # Test a full submission folder
-python -m mlperf_logging.package_checker $submissionDir hpc 0.5.0
+python3 -m mlperf_logging.package_checker <YOUR SUBMISSION_FOLDER> hpc 1.0.0
 ```
+
+There is also a script that performs compliance checks and summarizes the results. From the mlperf-logging directory (https://github.com/mlcommons/logging), use
+```
+./scripts/verify_for_v1.0_hpc.sh
+```
+
+
