@@ -19,10 +19,10 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 
-from openfold.model.msa_row_attention_with_pair_bias import MSARowAttentionWithPairBias
-from openfold.model.msa_column_attention import MSAColumnAttention
 from openfold.model.dropout import DropoutRowwise
 from openfold.model.evoformer_block_core import EvoformerBlockCore
+from openfold.model.msa_column_attention import MSAColumnAttention
+from openfold.model.msa_row_attention_with_pair_bias import MSARowAttentionWithPairBias
 
 
 class EvoformerBlock(nn.Module):
@@ -44,11 +44,15 @@ class EvoformerBlock(nn.Module):
         pair_dropout: Dropout rate for pair activations.
         inf: Safe infinity value.
         eps_opm: Epsilon to prevent division by zero in outer product mean.
-        chunk_size_msa_att: Optional chunk size for a batch-like dimension in MSA attention.
-        chunk_size_opm: Optional chunk size for a batch-like dimension in outer product mean.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_msa_att: Optional chunk size for a batch-like dimension
+            in MSA attention.
+        chunk_size_opm: Optional chunk size for a batch-like dimension
+            in outer product mean.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -104,14 +108,24 @@ class EvoformerBlock(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,          # [batch, N_seq, N_res, c_m] MSA representation
-        z: torch.Tensor,          # [batch, N_res, N_res, c_z] pair representation
-        msa_mask: torch.Tensor,   # [batch, N_seq, N_res] MSA mask
-        pair_mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-    ) -> Tuple[
-        torch.Tensor,  # m: [batch, N_seq, N_res, c_m] MSA representation
-        torch.Tensor,  # z: [batch, N_res, N_res, c_z] pair representation
-    ]:
+        m: torch.Tensor,
+        z: torch.Tensor,
+        msa_mask: torch.Tensor,
+        pair_mask: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Evoformer Block forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            msa_mask: [batch, N_seq, N_res] MSA mask
+            pair_mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            m: [batch, N_seq, N_res, c_m] updated MSA representation
+            z: [batch, N_res, N_res, c_z] updated pair representation
+
+        """
         m = m + self.msa_dropout_rowwise(self.msa_att_row(m=m, z=z, mask=msa_mask))
         m = m + self.msa_att_col(m=m, mask=msa_mask)
         m, z = self.core(

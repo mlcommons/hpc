@@ -32,6 +32,7 @@ class TemplateAngleEmbedder(nn.Module):
         c_m: Output MSA representation dimension (channels).
 
     """
+
     def __init__(
         self,
         ta_dim: int,
@@ -43,6 +44,15 @@ class TemplateAngleEmbedder(nn.Module):
 
     def forward(
         self,
-        template_angle_feat: torch.Tensor,   # [batch, N_templ, N_res, ta_dim]
-    ) -> torch.Tensor:                       # [batch, N_templ, N_res, c_m]
+        template_angle_feat: torch.Tensor,
+    ) -> torch.Tensor:
+        """Template Angle Embedder forward pass.
+
+        Args:
+            template_angle_feat: [batch, N_templ, N_res, ta_dim]
+
+        Returns:
+            template_angle_embedding: [batch, N_templ, N_res, c_m]
+
+        """
         return self.linear_2(torch.relu(self.linear_1(template_angle_feat)))

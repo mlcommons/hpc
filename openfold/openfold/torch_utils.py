@@ -36,8 +36,7 @@ def disable_tf32() -> None:
 
 def is_autocast_fp16_enabled() -> bool:
     return (
-        torch.is_autocast_enabled()
-        and torch.get_autocast_gpu_dtype() == torch.float16
+        torch.is_autocast_enabled() and torch.get_autocast_gpu_dtype() == torch.float16
     )
 
 

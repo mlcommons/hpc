@@ -19,8 +19,8 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 
 
 class RecyclingEmbedder(nn.Module):
@@ -37,6 +37,7 @@ class RecyclingEmbedder(nn.Module):
         inf: Safe infinity value.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -47,29 +48,36 @@ class RecyclingEmbedder(nn.Module):
         inf: float,
     ) -> None:
         super(RecyclingEmbedder, self).__init__()
-        # configuration:
         self.c_m = c_m
         self.c_z = c_z
         self.min_bin = min_bin
         self.max_bin = max_bin
         self.num_bins = num_bins
         self.inf = inf
-        # submodules:
         self.linear = Linear(self.num_bins, self.c_z, bias=True, init="default")
         self.layer_norm_m = LayerNorm(self.c_m)
         self.layer_norm_z = LayerNorm(self.c_z)
 
     def forward(
         self,
-        m0_prev: torch.Tensor,   # [batch, N_res, c_m]
-        z_prev: torch.Tensor,    # [batch, N_res, N_res, c_z]
-        x_prev: torch.Tensor,    # [batch, N_res, 3]
-    ) -> Tuple[
-        torch.Tensor,  # m0_update: [batch, N_res, c_m]
-        torch.Tensor,  # z_update: [batch, N_res, N_res, c_z]
-    ]:
-        """Supplementary '1.10 Recycling iterations': Algorithm 32."""
+        m0_prev: torch.Tensor,
+        z_prev: torch.Tensor,
+        x_prev: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Recycling Embedder forward pass.
 
+        Supplementary '1.10 Recycling iterations': Algorithm 32.
+
+        Args:
+            m0_prev: [batch, N_res, c_m]
+            z_prev: [batch, N_res, N_res, c_z]
+            x_prev: [batch, N_res, 3]
+
+        Returns:
+            m0_update: [batch, N_res, c_m]
+            z_update: [batch, N_res, N_res, c_z]
+
+        """
         # Embed pair distances of backbone atoms:
         bins = torch.linspace(
             start=self.min_bin,
@@ -82,7 +90,11 @@ class RecyclingEmbedder(nn.Module):
         lower = torch.pow(bins, 2)
         upper = torch.roll(lower, shifts=-1, dims=0)
         upper[-1] = self.inf
-        d = (x_prev.unsqueeze(-2) - x_prev.unsqueeze(-3)).pow(2).sum(dim=-1, keepdims=True)
+        d = (
+            (x_prev.unsqueeze(-2) - x_prev.unsqueeze(-3))
+            .pow(2)
+            .sum(dim=-1, keepdims=True)
+        )
         d = torch.logical_and(d > lower, d < upper).to(dtype=x_prev.dtype)
         d = self.linear(d)
 

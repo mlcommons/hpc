@@ -44,6 +44,7 @@ class Linear(nn.Linear):
             - "final": Weights=0, Bias=0
 
     """
+
     def __init__(
         self,
         in_features: int,

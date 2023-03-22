@@ -77,8 +77,7 @@ def dist_gather_val_metrics(
     keys = list(val_metrics_list[0].keys())
     keys.remove("pdb_chain_id")
     values_list = [
-        [val_metrics[key] for key in keys]
-        for val_metrics in val_metrics_list
+        [val_metrics[key] for key in keys] for val_metrics in val_metrics_list
     ]
     gather_tensor = torch.tensor(values_list, device=device)
     if is_main_process:

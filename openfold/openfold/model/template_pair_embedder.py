@@ -32,20 +32,28 @@ class TemplatePairEmbedder(nn.Module):
         c_t: Output template representation dimension (channels).
 
     """
+
     def __init__(
         self,
         tp_dim: int,
         c_t: int,
     ) -> None:
         super(TemplatePairEmbedder, self).__init__()
-        # configuration:
         self.tp_dim = tp_dim
         self.c_t = c_t
-        # submodules:
         self.linear = Linear(tp_dim, c_t, bias=True, init="relu")
 
     def forward(
         self,
-        template_pair_feat: torch.Tensor,   # [batch, N_res, N_res, tp_dim]
-    ) -> torch.Tensor:                      # [batch, N_res, N_res, c_t]
+        template_pair_feat: torch.Tensor,
+    ) -> torch.Tensor:
+        """Template Pair Embedder forward pass.
+
+        Args:
+            template_pair_feat: [batch, N_res, N_res, tp_dim]
+
+        Returns:
+            template_pair_embedding: [batch, N_res, N_res, c_t]
+
+        """
         return self.linear(template_pair_feat)

@@ -21,9 +21,9 @@ import torch
 import torch.nn as nn
 
 from openfold.config import AuxiliaryHeadsConfig
-from openfold.loss import compute_plddt, compute_tm, compute_predicted_aligned_error
-from openfold.model.linear import Linear
+from openfold.loss import compute_plddt, compute_predicted_aligned_error, compute_tm
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 from openfold.torch_utils import is_autocast_fp16_enabled
 
 
@@ -32,13 +32,23 @@ class AuxiliaryHeads(nn.Module):
 
     def __init__(self, config: AuxiliaryHeadsConfig) -> None:
         super(AuxiliaryHeads, self).__init__()
-        self.plddt = PerResidueLDDTCaPredictor(**asdict(config.per_residue_lddt_ca_predictor_config))
-        self.distogram = DistogramHead(**asdict(config.distogram_head_config))
-        self.masked_msa = MaskedMSAHead(**asdict(config.masked_msa_head_config))
-        self.experimentally_resolved = ExperimentallyResolvedHead(**asdict(config.experimentally_resolved_head_config))
+        self.plddt = PerResidueLDDTCaPredictor(
+            **asdict(config.per_residue_lddt_ca_predictor_config),
+        )
+        self.distogram = DistogramHead(
+            **asdict(config.distogram_head_config),
+        )
+        self.masked_msa = MaskedMSAHead(
+            **asdict(config.masked_msa_head_config),
+        )
+        self.experimentally_resolved = ExperimentallyResolvedHead(
+            **asdict(config.experimentally_resolved_head_config),
+        )
         self.tm_score_head_enabled = config.tm_score_head_enabled
         if self.tm_score_head_enabled:
-            self.tm = TMScoreHead(**asdict(config.tm_score_head_config))
+            self.tm = TMScoreHead(
+                **asdict(config.tm_score_head_config),
+            )
 
     def forward(self, outputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         aux_outputs = {}
@@ -46,7 +56,9 @@ class AuxiliaryHeads(nn.Module):
         aux_outputs["plddt"] = compute_plddt(logits=aux_outputs["lddt_logits"])
         aux_outputs["distogram_logits"] = self.distogram(outputs["pair"])
         aux_outputs["masked_msa_logits"] = self.masked_msa(outputs["msa"])
-        aux_outputs["experimentally_resolved_logits"] = self.experimentally_resolved(outputs["single"])
+        aux_outputs["experimentally_resolved_logits"] = self.experimentally_resolved(
+            outputs["single"]
+        )
         if self.tm_score_head_enabled:
             aux_outputs["tm_logits"] = self.tm(outputs["pair"])
             aux_outputs["predicted_tm_score"] = compute_tm(
@@ -75,6 +87,7 @@ class PerResidueLDDTCaPredictor(nn.Module):
         num_bins: Output dimension (channels).
 
     """
+
     def __init__(
         self,
         c_s: int,
@@ -109,6 +122,7 @@ class DistogramHead(nn.Module):
         num_bins: Output dimension (channels).
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -140,6 +154,7 @@ class MaskedMSAHead(nn.Module):
         c_out: Output dimension (channels).
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -163,6 +178,7 @@ class ExperimentallyResolvedHead(nn.Module):
         c_out: Output dimension (channels).
 
     """
+
     def __init__(
         self,
         c_s: int,
@@ -187,6 +203,7 @@ class TMScoreHead(nn.Module):
         max_bin: Max bin range for discretizing the distribution.
 
     """
+
     def __init__(
         self,
         c_z: int,

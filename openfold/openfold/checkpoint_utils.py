@@ -35,7 +35,9 @@ def resume_checkpoint(
 ) -> int:
     # Load the resumable checkpoint:
     resumable_checkpoint_filepath = checkpoint_dirpath / RESUMABLE_CHECKPOINT_FILENAME
-    resumable_checkpoint = torch.load(resumable_checkpoint_filepath, map_location=device)
+    resumable_checkpoint = torch.load(
+        resumable_checkpoint_filepath, map_location=device
+    )
     iteration = resumable_checkpoint["iteration"]
     alphafold_state_dict = resumable_checkpoint["alphafold_state_dict"]
     alphafold.load_state_dict(alphafold_state_dict, strict=True)
@@ -60,12 +62,14 @@ def resume_from_latest_checkpoint(
 ) -> int:
     checkpoints_dirpath = training_dirpath / "checkpoints"
     last_checkpoints_dirpath = checkpoints_dirpath / "last"
-    last_checkpoint_dirpaths = _get_sorted_last_checkpoint_dirpaths(last_checkpoints_dirpath)
+    last_checkpoint_dirpaths = _get_sorted_last_checkpoint_dirpaths(
+        last_checkpoints_dirpath=last_checkpoints_dirpath,
+    )
     if len(last_checkpoint_dirpaths) == 0:
         return 0
     last_checkpoint_dirpath = last_checkpoint_dirpaths[0]
     if verbose:
-        print(f"Resuming checkpoint from {repr(str(last_checkpoint_dirpath))}...")
+        print(f"Resuming checkpoint from {repr(last_checkpoint_dirpath)}...")
     iteration = resume_checkpoint(
         alphafold=alphafold,
         optimizer=optimizer,
@@ -74,7 +78,7 @@ def resume_from_latest_checkpoint(
         device=device,
     )
     if verbose:
-        print(f"Checkpoint resumed from {repr(str(last_checkpoint_dirpath))} successfully!")
+        print(f"Checkpoint resumed from {repr(last_checkpoint_dirpath)} successfully!")
     return iteration
 
 
@@ -150,10 +154,12 @@ def save_checkpoint_from_training(
             target_dirpath=val_checkpoint_dirpath,
             force=True,
         )
-        print(f"Saved to {repr(str(val_checkpoint_dirpath))} successfully!")
+        print(f"Saved to {repr(val_checkpoint_dirpath)} successfully!")
     # Copy if best checkpoint:
     if is_validation and keep_best_checkpoints > 0:
-        best_checkpoint_dirpath = checkpoints_dirpath / "best" / f"{val_avg_lddt_ca_str}_{iteration_str}"
+        best_checkpoint_dirpath = (
+            checkpoints_dirpath / "best" / f"{val_avg_lddt_ca_str}_{iteration_str}"
+        )
         if _is_best_checkpoint_to_save(
             best_checkpoint_dirpath=best_checkpoint_dirpath,
             keep_best_checkpoints=keep_best_checkpoints,
@@ -163,7 +169,7 @@ def save_checkpoint_from_training(
                 target_dirpath=best_checkpoint_dirpath,
                 force=True,
             )
-            print(f"Saved to {repr(str(best_checkpoint_dirpath))} successfully!")
+            print(f"Saved to {repr(best_checkpoint_dirpath)} successfully!")
     # Move tmp to last checkpoints:
     last_checkpoint_dirpath = checkpoints_dirpath / "last" / iteration_str
     _move_checkpoint_dirpath(
@@ -171,7 +177,7 @@ def save_checkpoint_from_training(
         target_dirpath=last_checkpoint_dirpath,
         force=True,
     )
-    print(f"Saved to {repr(str(last_checkpoint_dirpath))} successfully!")
+    print(f"Saved to {repr(last_checkpoint_dirpath)} successfully!")
     # Delete expendable checkpoints:
     _delete_best_checkpoints(
         best_checkpoints_dirpath=(checkpoints_dirpath / "best"),
@@ -225,20 +231,24 @@ def _delete_best_checkpoints(
     best_checkpoints_dirpath: Path,
     keep_best_checkpoints: int,
 ) -> None:
-    sorted_best_checkpoint_dirpaths = _get_sorted_best_checkpoint_dirpaths(best_checkpoints_dirpath)
-    surplus_best_checkpoint_dirpaths = sorted_best_checkpoint_dirpaths[keep_best_checkpoints:]
-    for surplus_best_checkpoint_dirpath in surplus_best_checkpoint_dirpaths:
-        shutil.rmtree(surplus_best_checkpoint_dirpath)
+    sorted_best_checkpoints = _get_sorted_best_checkpoint_dirpaths(
+        best_checkpoints_dirpath=best_checkpoints_dirpath,
+    )
+    surplus_best_checkpoints = sorted_best_checkpoints[keep_best_checkpoints:]
+    for surplus_best_checkpoint in surplus_best_checkpoints:
+        shutil.rmtree(surplus_best_checkpoint)
 
 
 def _delete_last_checkpoints(
     last_checkpoints_dirpath: Path,
     keep_last_checkpoints: int,
 ) -> None:
-    sorted_last_checkpoint_dirpaths = _get_sorted_last_checkpoint_dirpaths(last_checkpoints_dirpath)
-    surplus_last_checkpoint_dirpaths = sorted_last_checkpoint_dirpaths[keep_last_checkpoints:]
-    for surplus_last_checkpoint_dirpath in surplus_last_checkpoint_dirpaths:
-        shutil.rmtree(surplus_last_checkpoint_dirpath)
+    sorted_last_checkpoints = _get_sorted_last_checkpoint_dirpaths(
+        last_checkpoints_dirpath=last_checkpoints_dirpath,
+    )
+    surplus_last_checkpoints = sorted_last_checkpoints[keep_last_checkpoints:]
+    for surplus_last_checkpoint in surplus_last_checkpoints:
+        shutil.rmtree(surplus_last_checkpoint)
 
 
 def _is_best_checkpoint_to_save(
@@ -247,10 +257,12 @@ def _is_best_checkpoint_to_save(
 ) -> bool:
     if keep_best_checkpoints == 0:
         return False
-    sorted_best_checkpoint_dirpaths = _get_sorted_best_checkpoint_dirpaths(best_checkpoint_dirpath.parent)
-    if keep_best_checkpoints > len(sorted_best_checkpoint_dirpaths):
+    sorted_best_checkpoints = _get_sorted_best_checkpoint_dirpaths(
+        best_checkpoints_dirpath=best_checkpoint_dirpath.parent,
+    )
+    if keep_best_checkpoints > len(sorted_best_checkpoints):
         return True
-    for existing_best_checkpoint_dirpath in sorted_best_checkpoint_dirpaths[:keep_best_checkpoints]:
-        if best_checkpoint_dirpath >= existing_best_checkpoint_dirpath:
+    for checkpoint_dirpath in sorted_best_checkpoints[:keep_best_checkpoints]:
+        if best_checkpoint_dirpath >= checkpoint_dirpath:
             return True
     return False

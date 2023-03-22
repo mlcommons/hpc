@@ -19,16 +19,16 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from openfold.model.dropout import DropoutColumnwise, DropoutRowwise
+from openfold.model.pair_transition import PairTransition
 from openfold.model.triangular_attention import (
-    TriangleAttentionStartingNode,
     TriangleAttentionEndingNode,
+    TriangleAttentionStartingNode,
 )
 from openfold.model.triangular_multiplicative_update import (
-    TriangleMultiplicationOutgoing,
     TriangleMultiplicationIncoming,
+    TriangleMultiplicationOutgoing,
 )
-from openfold.model.dropout import DropoutRowwise, DropoutColumnwise
-from openfold.model.pair_transition import PairTransition
 
 
 class TemplatePairBlock(nn.Module):
@@ -44,9 +44,11 @@ class TemplatePairBlock(nn.Module):
         pair_transition_n: Channel multiplier in pair transition.
         dropout_rate: Dropout rate for pair activations.
         inf: Safe infinity value.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
+
     def __init__(
         self,
         c_t: int,
@@ -100,9 +102,19 @@ class TemplatePairBlock(nn.Module):
 
     def forward(
         self,
-        t: torch.tensor,     # [batch, N_templ, N_res, N_res, c_t] template representation
-        mask: torch.tensor,  # [batch, N_res, N_res] pair mask
-    ) -> torch.Tensor:       # [batch, N_templ, N_res, N_res, c_t] template representation
+        t: torch.tensor,
+        mask: torch.tensor,
+    ) -> torch.Tensor:
+        """Template Pair Block forward pass.
+
+        Args:
+            t: [batch, N_templ, N_res, N_res, c_t] template representation
+            mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            t: [batch, N_templ, N_res, N_res, c_t] updated template representation
+
+        """
         t_list = list(torch.unbind(t, dim=-4))
         N_templ = len(t_list)
         for i in range(N_templ):

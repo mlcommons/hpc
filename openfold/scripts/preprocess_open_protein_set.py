@@ -28,11 +28,37 @@ NUM_PHYSICAL_CPU_CORES = psutil.cpu_count(logical=False)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--open_protein_set_dirpath", type=Path, required=True, help="Path to OpenProteinSet data directory. Download it via `scripts/download_open_protein_set.sh`.")
-    parser.add_argument("--output_dirpath", type=Path, required=True, help="Path to output directory.")
-    parser.add_argument("--num_shards", type=int, default=10, help="Num shards in output database.")
-    parser.add_argument("--num_parallel_processes", type=int, default=NUM_PHYSICAL_CPU_CORES, help="Num parallel processes used during preprocessing. Default is equal to num physical CPU cores.")
-    parser.add_argument("--force", action="store_true", help="Whether to override existing output files.")
+    parser.add_argument(
+        "--open_protein_set_dirpath",
+        type=Path,
+        required=True,
+        help="""Path to OpenProteinSet data directory.
+        Download it via `scripts/download_open_protein_set.sh`.""",
+    )
+    parser.add_argument(
+        "--output_dirpath",
+        type=Path,
+        required=True,
+        help="Path to output directory.",
+    )
+    parser.add_argument(
+        "--num_shards",
+        type=int,
+        default=10,
+        help="Num shards in output database.",
+    )
+    parser.add_argument(
+        "--num_parallel_processes",
+        type=int,
+        default=NUM_PHYSICAL_CPU_CORES,
+        help="""Num parallel processes used during preprocessing.
+        Default is equal to num physical CPU cores.""",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Whether to override existing output files.",
+    )
     args = parser.parse_args()
     return args
 
@@ -40,7 +66,9 @@ def parse_args() -> argparse.Namespace:
 def load_pdb_chain_clusters(pdb_chain_clusters_filepath: Path) -> List[List[str]]:
     with open(pdb_chain_clusters_filepath) as f:
         pdb_chain_clusters = f.read().strip().split("\n")
-    pdb_chain_clusters = [pdb_chain_cluster.split() for pdb_chain_cluster in pdb_chain_clusters]
+    pdb_chain_clusters = [
+        pdb_chain_cluster.split() for pdb_chain_cluster in pdb_chain_clusters
+    ]
     return pdb_chain_clusters
 
 
@@ -58,7 +86,8 @@ def write_pdb_alignments_shard(
     with open(shard_filepath, "wb") as f_out:
         start = 0
         for pdb_subdirpath_cluster_pair in shard:
-            open_protein_set_pdb_subdirpath, pdb_chain_cluster = pdb_subdirpath_cluster_pair
+            open_protein_set_pdb_subdirpath = pdb_subdirpath_cluster_pair[0]
+            pdb_chain_cluster = pdb_subdirpath_cluster_pair[1]
             alignments_index = {
                 "db": shard_filename,
                 "files": [],
@@ -79,12 +108,20 @@ def write_pdb_alignments_shard(
     return shard_index
 
 
-def apply_func_parallel(func: Callable, args_list: List[tuple], num_parallel_processes: int) -> list:
+def apply_func_parallel(
+    func: Callable,
+    args_list: List[tuple],
+    num_parallel_processes: int,
+) -> list:
     if not isinstance(args_list, list):
-        raise TypeError(f"args_list is of type {type(args_list)}, but it should be of type {list}.")
+        raise TypeError(
+            f"args_list is of type {type(args_list)}, but it should be of type {list}."
+        )
     for args in args_list:
         if not isinstance(args, tuple):
-            raise TypeError(f"args is of type {type(args)}, but it should be of type {tuple}.")
+            raise TypeError(
+                f"args is of type {type(args)}, but it should be of type {tuple}."
+            )
 
     if num_parallel_processes > 0:
         async_results = []
@@ -118,14 +155,18 @@ def preprocess_open_protein_set_pdb_alignments(
     if not open_protein_set_pdb_dirpath.exists():
         raise FileNotFoundError(f"{repr(open_protein_set_pdb_dirpath)} does not exist!")
 
-    open_protein_set_pdb_subdirpaths = sorted(list(open_protein_set_pdb_dirpath.glob("*")))
+    open_protein_set_pdb_subdirpaths = sorted(
+        list(open_protein_set_pdb_dirpath.glob("*"))
+    )
     print(
         f"Found {len(open_protein_set_pdb_subdirpaths)} subdirectories"
-        f" inside {repr(str(open_protein_set_pdb_dirpath))}."
+        f" inside {repr(open_protein_set_pdb_dirpath)}."
     )
 
     pdb_chain_clusters_filepath = open_protein_set_dirpath / "duplicate_pdb_chains.txt"
-    pdb_chain_clusters = load_pdb_chain_clusters(pdb_chain_clusters_filepath=pdb_chain_clusters_filepath)
+    pdb_chain_clusters = load_pdb_chain_clusters(
+        pdb_chain_clusters_filepath=pdb_chain_clusters_filepath,
+    )
     pdb_chain_id_to_cluster_index = {}
     for cluster_index, pdb_chain_cluster in enumerate(pdb_chain_clusters):
         for pdb_chain_id in pdb_chain_cluster:
@@ -141,7 +182,10 @@ def preprocess_open_protein_set_pdb_alignments(
         cluster_index = pdb_chain_id_to_cluster_index[pdb_chain_id]
         assert cluster_index not in assigned_clusters_indexes
         pdb_chain_cluster = pdb_chain_clusters[cluster_index]
-        pdb_subdirpath_cluster_pair = (open_protein_set_pdb_subdirpath, pdb_chain_cluster)
+        pdb_subdirpath_cluster_pair = (
+            open_protein_set_pdb_subdirpath,
+            pdb_chain_cluster,
+        )
         shards[shard_id].append(pdb_subdirpath_cluster_pair)
         assigned_clusters_indexes.add(cluster_index)
     print("pdb alignments shards:")
@@ -149,7 +193,10 @@ def preprocess_open_protein_set_pdb_alignments(
         print(f"shard_id={shard_id} len(shard)={len(shard)}")
 
     output_pdb_alignments_dirpath.mkdir(exist_ok=force)
-    print(f"output pdb alignments shards will be saved to {repr(str(output_pdb_alignments_dirpath))}")
+    print(
+        "output pdb alignments shards will be saved to "
+        f"{repr(output_pdb_alignments_dirpath)}"
+    )
 
     print("writing pdb alignments shards...")
     shard_index_list = apply_func_parallel(
@@ -172,7 +219,11 @@ def preprocess_open_protein_set_pdb_alignments(
         assert not pdb_alignments_super_index_filepath.exists()
     with open(pdb_alignments_super_index_filepath, "w") as f:
         json.dump(pdb_alignments_super_index, f)
-    print(f"pdb alignments super index saved to {repr(str(pdb_alignments_super_index_filepath))} successfully!")
+    print(
+        "pdb alignments super index saved to "
+        f"{repr(pdb_alignments_super_index_filepath)} "
+        "successfully!"
+    )
 
     print("preprocess_open_protein_set_pdb_alignments finished successfully!")
 
@@ -186,8 +237,8 @@ def preprocess_open_protein_set(
 ) -> None:
     print("preprocess_open_protein_set has started...")
 
-    print(f"open_protein_set_dirpath={repr(str(open_protein_set_dirpath))}")
-    print(f"output_dirpath={repr(str(output_dirpath))}")
+    print(f"open_protein_set_dirpath={repr(open_protein_set_dirpath)}")
+    print(f"output_dirpath={repr(output_dirpath)}")
     print(f"num_shards={num_shards}")
     print(f"num_parallel_processes={num_parallel_processes}")
     print(f"force={force}")

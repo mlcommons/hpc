@@ -23,7 +23,7 @@ from openfold.helpers import get_seed_from_string
 
 
 class InitialTrainingSampler(Sampler[Tuple[int, int]]):
-    """Sampler for the initial training dataset."""
+    """Sampler for initial training dataset."""
 
     def __init__(
         self,
@@ -88,7 +88,7 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
 
 
 class ValidationSampler(Sampler[Tuple[int, int]]):
-    """Sampler for the Validation Dataset."""
+    """Sampler for validation dataset."""
 
     def __init__(
         self,
@@ -105,8 +105,7 @@ class ValidationSampler(Sampler[Tuple[int, int]]):
         else:
             epoch_length = dataset_length
         seeds = [
-            get_seed_from_string(pdb_chain_id)
-            for pdb_chain_id in dataset.pdb_chain_ids
+            get_seed_from_string(pdb_chain_id) for pdb_chain_id in dataset.pdb_chain_ids
         ]
         self.is_distributed = is_distributed
         self.rank = rank
@@ -126,7 +125,7 @@ class ValidationSampler(Sampler[Tuple[int, int]]):
                 nrepeat = math.ceil(padding_size / len(indices))
                 padding = (indices * nrepeat)[:padding_size]
             indices = indices + padding
-            indices = indices[self.rank::self.world_size]
+            indices = indices[self.rank :: self.world_size]
         assert len(indices) == self._epoch_length
         seeds = [self._seeds[index] for index in indices]
         assert len(seeds) == self._epoch_length
@@ -134,4 +133,5 @@ class ValidationSampler(Sampler[Tuple[int, int]]):
         yield from zip(indices, seeds)
 
     def __len__(self) -> int:
+j
         return self._epoch_length

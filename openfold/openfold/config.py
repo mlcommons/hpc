@@ -14,181 +14,185 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import List, Optional
 
 import dacite
 
 
-# ---------------------------- ALPHAFOLD MODULES ----------------------------- #
-
 @dataclass
 class InputEmbedderConfig:
-    tf_dim: int = 22  # Input `target_feat` dimension (channels).
-    msa_dim: int = 49  # Input `msa_feat` dimension (channels).
-    c_z: int = 128  # Output pair representation dimension (channels).
-    c_m: int = 256  # Output MSA representation dimension (channels).
-    relpos_k: int = 32  # Relative position clip distance.
+    tf_dim: int = 22
+    msa_dim: int = 49
+    c_z: int = 128
+    c_m: int = 256
+    relpos_k: int = 32
 
 
 @dataclass
 class RecyclingEmbedderConfig:
-    c_m: int = 256  # MSA representation dimension (channels).
-    c_z: int = 128  # Pair representation dimension (channels).
-    min_bin: float = 3.25  # Smallest distogram bin (Angstroms).
-    max_bin: float = 20.75  # Largest distogram bin (Angstroms).
-    num_bins: int = 15  # Number of distogram bins.
-    inf: float = 1e8  # Safe infinity value.
+    c_m: int = 256
+    c_z: int = 128
+    min_bin: float = 3.25
+    max_bin: float = 20.75
+    num_bins: int = 15
+    inf: float = 1e8
 
 
 @dataclass
 class TemplateAngleEmbedderConfig:
-    ta_dim: int = 57  # Input `template_angle_feat` dimension (channels).
-    c_m: int = 256  # Output MSA representation dimension (channels).
+    ta_dim: int = 57
+    c_m: int = 256
 
 
 @dataclass
 class TemplatePairEmbedderConfig:
-    tp_dim: int = 88  # Input `template_pair_feat` dimension (channels).
-    c_t: int = 64  # Output template representation dimension (channels).
+    tp_dim: int = 88
+    c_t: int = 64
 
 
 @dataclass
 class TemplatePairStackConfig:
-    c_t: int = 64  # Template representation dimension (channels).
-    c_hidden_tri_att: int = 16  # Hidden dimension in triangular attention.
-    c_hidden_tri_mul: int = 64  # Hidden dimension in multiplicative updates.
-    num_blocks: int = 2  # Number of blocks in the stack.
-    num_heads_tri: int = 4  # Number of heads used in triangular attention.
-    pair_transition_n: int = 2  # Channel multiplier in pair transition.
-    dropout_rate: float = 0.25  # Dropout rate for pair activations.
-    inf: float = 1e9  # Safe infinity value.
-    chunk_size_tri_att: Optional[int] = None  # Optional chunk size for a batch-like dimension in triangular attention.
+    c_t: int = 64
+    c_hidden_tri_att: int = 16
+    c_hidden_tri_mul: int = 64
+    num_blocks: int = 2
+    num_heads_tri: int = 4
+    pair_transition_n: int = 2
+    dropout_rate: float = 0.25
+    inf: float = 1e9
+    chunk_size_tri_att: Optional[int] = None
 
 
 @dataclass
 class TemplatePointwiseAttentionConfig:
-    c_t: int = 64  # Template representation dimension (channels).
-    c_z: int = 128  # Pair representation dimension (channels).
-    c_hidden: int = 16  # Hidden dimension (per-head).
-    num_heads: int = 4  # Number of attention heads.
-    inf: float = 1e5  # Safe infinity value.
-    chunk_size: Optional[int] = None  # Optional chunk size for a batch-like dimension
+    c_t: int = 64
+    c_z: int = 128
+    c_hidden: int = 16
+    num_heads: int = 4
+    inf: float = 1e5
+    chunk_size: Optional[int] = None
 
 
 @dataclass
 class ExtraMSAEmbedderConfig:
-    emsa_dim: int = 25  # Input `extra_msa_feat` dimension (channels).
-    c_e: int = 64  # Output extra MSA representation dimension (channels).
+    emsa_dim: int = 25
+    c_e: int = 64
 
 
 @dataclass
 class ExtraMSAStackConfig:
-    c_e: int = 64  # Extra MSA representation dimension (channels).
-    c_z: int = 128  # Pair representation dimension (channels).
-    c_hidden_msa_att: int = 8  # Hidden dimension in MSA attention.
-    c_hidden_opm: int = 32  # Hidden dimension in outer product mean.
-    c_hidden_tri_mul: int = 128  # Hidden dimension in multiplicative updates.
-    c_hidden_tri_att: int = 32  # Hidden dimension in triangular attention.
-    num_heads_msa: int = 8  # Number of heads used in MSA attention.
-    num_heads_tri: int = 4  # Number of heads used in triangular attention.
-    num_blocks: int = 4  # Number of blocks in the stack.
-    transition_n: int = 4  # Channel multiplier in transitions.
-    msa_dropout: float = 0.15  # Dropout rate for MSA activations.
-    pair_dropout: float = 0.25  # Dropout rate for pair activations.
-    inf: float = 1e9  # Safe infinity value.
-    eps: float = 1e-8  # Epsilon to prevent division by zero.
-    eps_opm: float = 1e-3  # Epsilon to prevent division by zero in outer product mean.
-    chunk_size_msa_att: Optional[int] = None  # Optional chunk size for a batch-like dimension in MSA attention.
-    chunk_size_opm: Optional[int] = None  # Optional chunk size for a batch-like dimension in outer product mean.
-    chunk_size_tri_att: Optional[int] = None  # Optional chunk size for a batch-like dimension in triangular attention.
+    c_e: int = 64
+    c_z: int = 128
+    c_hidden_msa_att: int = 8
+    c_hidden_opm: int = 32
+    c_hidden_tri_mul: int = 128
+    c_hidden_tri_att: int = 32
+    num_heads_msa: int = 8
+    num_heads_tri: int = 4
+    num_blocks: int = 4
+    transition_n: int = 4
+    msa_dropout: float = 0.15
+    pair_dropout: float = 0.25
+    inf: float = 1e9
+    eps: float = 1e-8
+    eps_opm: float = 1e-3
+    chunk_size_msa_att: Optional[int] = None
+    chunk_size_opm: Optional[int] = None
+    chunk_size_tri_att: Optional[int] = None
 
 
 @dataclass
 class EvoformerStackConfig:
-    c_m: int = 256  # MSA representation dimension (channels).
-    c_z: int = 128  # Pair representation dimension (channels).
-    c_hidden_msa_att: int = 32  # Hidden dimension in MSA attention.
-    c_hidden_opm: int = 32  # Hidden dimension in outer product mean.
-    c_hidden_tri_mul: int = 128  # Hidden dimension in multiplicative updates.
-    c_hidden_tri_att: int = 32  # Hidden dimension in triangular attention.
-    c_s: int = 384  # Single representation dimension (channels).
-    num_heads_msa: int = 8  # Number of heads used in MSA attention.
-    num_heads_tri: int = 4  # Number of heads used in triangular attention.
-    num_blocks: int = 48  # Number of blocks in the stack.
-    transition_n: int = 4  # Channel multiplier in transitions.
-    msa_dropout: float = 0.15  # Dropout rate for MSA activations.
-    pair_dropout: float = 0.25  # Dropout rate for pair activations.
-    inf: float = 1e9  # Safe infinity value.
-    eps_opm: float = 1e-3  # Epsilon to prevent division by zero in outer product mean.
-    chunk_size_msa_att: Optional[int] = None  # Optional chunk size for a batch-like dimension in MSA attention.
-    chunk_size_opm: Optional[int] = None  # Optional chunk size for a batch-like dimension in outer product mean.
-    chunk_size_tri_att: Optional[int] = None  # Optional chunk size for a batch-like dimension in triangular attention.
+    c_m: int = 256
+    c_z: int = 128
+    c_hidden_msa_att: int = 32
+    c_hidden_opm: int = 32
+    c_hidden_tri_mul: int = 128
+    c_hidden_tri_att: int = 32
+    c_s: int = 384
+    num_heads_msa: int = 8
+    num_heads_tri: int = 4
+    num_blocks: int = 48
+    transition_n: int = 4
+    msa_dropout: float = 0.15
+    pair_dropout: float = 0.25
+    inf: float = 1e9
+    eps_opm: float = 1e-3
+    chunk_size_msa_att: Optional[int] = None
+    chunk_size_opm: Optional[int] = None
+    chunk_size_tri_att: Optional[int] = None
 
 
 @dataclass
 class StructureModuleConfig:
-    c_s: int = 384  # Single representation dimension (channels).
-    c_z: int = 128  # Pair representation dimension (channels).
-    c_hidden_ipa: int = 16  # Hidden dimension in invariant point attention.
-    c_hidden_ang_res: int = 128  # Hidden dimension in angle resnet.
-    num_heads_ipa: int = 12  # Number of heads used in invariant point attention.
-    num_qk_points: int = 4  # Number of query/key points generated in invariant point attention.
-    num_v_points: int = 8  # Number of value points generated in invariant point attention.
-    dropout_rate: float = 0.1  # Dropout rate in structure module
-    num_blocks: int = 8  # Number of shared blocks in the forward pass.
-    num_ang_res_blocks: int = 2  # Number of blocks in angle resnet.
-    num_angles: int = 7  # Number of angles in angle resnet.
-    scale_factor: float = 10.0  # Scale translation factor.
-    inf: float = 1e5  # Safe infinity value.
-    eps: float = 1e-8  # Epsilon to prevent division by zero.
+    c_s: int = 384
+    c_z: int = 128
+    c_hidden_ipa: int = 16
+    c_hidden_ang_res: int = 128
+    num_heads_ipa: int = 12
+    num_qk_points: int = 4
+    num_v_points: int = 8
+    dropout_rate: float = 0.1
+    num_blocks: int = 8
+    num_ang_res_blocks: int = 2
+    num_angles: int = 7
+    scale_factor: float = 10.0
+    inf: float = 1e5
+    eps: float = 1e-8
 
-
-# ----------------------------- AUXILIARY HEADS ------------------------------ #
 
 @dataclass
 class PerResidueLDDTCaPredictorConfig:
-    c_s: int = 384  # Single representation dimension (channels).
-    c_hidden: int = 128  # Hidden dimension (channels).
-    num_bins: int = 50  # Output dimension (channels).
+    c_s: int = 384
+    c_hidden: int = 128
+    num_bins: int = 50
 
 
 @dataclass
 class DistogramHeadConfig:
-    c_z: int = 128  # Pair representation dimension (channels).
-    num_bins: int = 64  # Output dimension (channels).
+    c_z: int = 128
+    num_bins: int = 64
 
 
 @dataclass
 class MaskedMSAHeadConfig:
-    c_m: int = 256  # MSA representation dimension (channels).
-    c_out: int = 23  # Output dimension (channels).
+    c_m: int = 256
+    c_out: int = 23
 
 
 @dataclass
 class ExperimentallyResolvedHeadConfig:
-    c_s: int = 384  # Single representation dimension (channels).
-    c_out: int = 37  # Output dimension (channels).
+    c_s: int = 384
+    c_out: int = 37
 
 
 @dataclass
 class TMScoreHeadConfig:
-    c_z: int = 128  # Pair representation dimension (channels).
-    num_bins: int = 64  # Output dimension (channels).
-    max_bin: int = 31  # Max bin range for discretizing the distribution.
+    c_z: int = 128
+    num_bins: int = 64
+    max_bin: int = 31
 
 
 @dataclass
 class AuxiliaryHeadsConfig:
-    per_residue_lddt_ca_predictor_config: PerResidueLDDTCaPredictorConfig = field(default=PerResidueLDDTCaPredictorConfig())
-    distogram_head_config: DistogramHeadConfig = field(default=DistogramHeadConfig())
-    masked_msa_head_config: MaskedMSAHeadConfig = field(default=MaskedMSAHeadConfig())
-    experimentally_resolved_head_config: ExperimentallyResolvedHeadConfig = field(default=ExperimentallyResolvedHeadConfig())
-    tm_score_head_config: TMScoreHeadConfig = field(default=TMScoreHeadConfig())
+    per_residue_lddt_ca_predictor_config: PerResidueLDDTCaPredictorConfig = field(
+        default=PerResidueLDDTCaPredictorConfig(),
+    )
+    distogram_head_config: DistogramHeadConfig = field(
+        default=DistogramHeadConfig(),
+    )
+    masked_msa_head_config: MaskedMSAHeadConfig = field(
+        default=MaskedMSAHeadConfig(),
+    )
+    experimentally_resolved_head_config: ExperimentallyResolvedHeadConfig = field(
+        default=ExperimentallyResolvedHeadConfig(),
+    )
+    tm_score_head_config: TMScoreHeadConfig = field(
+        default=TMScoreHeadConfig(),
+    )
     tm_score_head_enabled: bool = False
 
-
-# ------------------------------ LOSS FUNCTIONS ------------------------------ #
 
 @dataclass
 class FAPELossConfig:
@@ -264,34 +268,70 @@ class TMLossConfig:
 
 @dataclass
 class LossConfig:
-    fape_loss_config: FAPELossConfig = field(default=FAPELossConfig())
-    supervised_chi_loss_config: SupervisedChiLossConfig = field(default=SupervisedChiLossConfig())
-    distogram_loss_config: DistogramLossConfig = field(default=DistogramLossConfig())
-    masked_msa_loss_config: MaskedMSALossConfig = field(default=MaskedMSALossConfig())
-    plddt_loss_config: PLDDTLossConfig = field(default=PLDDTLossConfig())
-    experimentally_resolved_loss_config: ExperimentallyResolvedLossConfig = field(default=ExperimentallyResolvedLossConfig())
-    violation_loss_config: ViolationLossConfig = field(default=ViolationLossConfig())
-    tm_loss_config: TMLossConfig = field(default=TMLossConfig())
+    fape_loss_config: FAPELossConfig = field(
+        default=FAPELossConfig(),
+    )
+    supervised_chi_loss_config: SupervisedChiLossConfig = field(
+        default=SupervisedChiLossConfig(),
+    )
+    distogram_loss_config: DistogramLossConfig = field(
+        default=DistogramLossConfig(),
+    )
+    masked_msa_loss_config: MaskedMSALossConfig = field(
+        default=MaskedMSALossConfig(),
+    )
+    plddt_loss_config: PLDDTLossConfig = field(
+        default=PLDDTLossConfig(),
+    )
+    experimentally_resolved_loss_config: ExperimentallyResolvedLossConfig = field(
+        default=ExperimentallyResolvedLossConfig(),
+    )
+    violation_loss_config: ViolationLossConfig = field(
+        default=ViolationLossConfig(),
+    )
+    tm_loss_config: TMLossConfig = field(
+        default=TMLossConfig(),
+    )
 
-
-# ----------------------------- ALPHAFOLD CONFIG ----------------------------- #
 
 @dataclass
 class AlphaFoldConfig:
     preset: str = "default"
 
     # AlphaFold modules configuration:
-    input_embedder_config: InputEmbedderConfig = field(default=InputEmbedderConfig())
-    recycling_embedder_config: RecyclingEmbedderConfig = field(default=RecyclingEmbedderConfig())
-    template_angle_embedder_config: TemplateAngleEmbedderConfig = field(default=TemplateAngleEmbedderConfig())
-    template_pair_embedder_config: TemplatePairEmbedderConfig = field(default=TemplatePairEmbedderConfig())
-    template_pair_stack_config: TemplatePairStackConfig = field(default=TemplatePairStackConfig())
-    template_pointwise_attention_config: TemplatePointwiseAttentionConfig = field(default=TemplatePointwiseAttentionConfig())
-    extra_msa_embedder_config: ExtraMSAEmbedderConfig = field(default=ExtraMSAEmbedderConfig())
-    extra_msa_stack_config: ExtraMSAStackConfig = field(default=ExtraMSAStackConfig())
-    evoformer_stack_config: EvoformerStackConfig = field(default=EvoformerStackConfig())
-    structure_module_config: StructureModuleConfig = field(default=StructureModuleConfig())
-    auxiliary_heads_config: AuxiliaryHeadsConfig = field(default=AuxiliaryHeadsConfig())
+    input_embedder_config: InputEmbedderConfig = field(
+        default=InputEmbedderConfig(),
+    )
+    recycling_embedder_config: RecyclingEmbedderConfig = field(
+        default=RecyclingEmbedderConfig(),
+    )
+    template_angle_embedder_config: TemplateAngleEmbedderConfig = field(
+        default=TemplateAngleEmbedderConfig(),
+    )
+    template_pair_embedder_config: TemplatePairEmbedderConfig = field(
+        default=TemplatePairEmbedderConfig(),
+    )
+    template_pair_stack_config: TemplatePairStackConfig = field(
+        default=TemplatePairStackConfig(),
+    )
+    template_pointwise_attention_config: TemplatePointwiseAttentionConfig = field(
+        default=TemplatePointwiseAttentionConfig(),
+    )
+    extra_msa_embedder_config: ExtraMSAEmbedderConfig = field(
+        default=ExtraMSAEmbedderConfig(),
+    )
+    extra_msa_stack_config: ExtraMSAStackConfig = field(
+        default=ExtraMSAStackConfig(),
+    )
+    evoformer_stack_config: EvoformerStackConfig = field(
+        default=EvoformerStackConfig(),
+    )
+    structure_module_config: StructureModuleConfig = field(
+        default=StructureModuleConfig(),
+    )
+    auxiliary_heads_config: AuxiliaryHeadsConfig = field(
+        default=AuxiliaryHeadsConfig(),
+    )
 
     # Training loss configuration:
     loss_config: LossConfig = field(default=LossConfig())
@@ -299,7 +339,7 @@ class AlphaFoldConfig:
     self_distillation_plddt_threshold: float = 50.0
 
     # Sequence crop & pad size (for "train" mode only):
-    train_sequence_crop_size: int = 256  # (N_res)
+    train_sequence_crop_size: int = 256  # N_res
 
     # Recycling (last dimension in the batch dict):
     num_recycling_iters: int = 3
@@ -317,9 +357,9 @@ class AlphaFoldConfig:
         ]
     )
 
-    # MSA configuration:
+    # MSA features configuration:
     max_msa_clusters: int = 124  # Number of clustered MSA sequences (N_clust)
-    max_extra_msa: int = 1024  # Number of unclustered (extra) sequences (N_extra_seq)
+    max_extra_msa: int = 1024  # Number of unclustered extra sequences (N_extra_seq)
     max_distillation_msa_clusters: int = 1000
     masked_msa_enabled: bool = True
     masked_msa_profile_prob: float = 0.1
@@ -328,7 +368,7 @@ class AlphaFoldConfig:
     masked_msa_replace_fraction: float = 0.15
     msa_cluster_features: bool = True
 
-    # Template configuration:
+    # Template features configuration:
     templates_enabled: bool = True
     max_templates: int = 4  # Number of templates (N_templ)
     shuffle_top_k_prefiltered: int = 20
@@ -406,8 +446,6 @@ class AlphaFoldConfig:
         return asdict(self)
 
 
-# --------------------------------- PRESETS ---------------------------------- #
-
 def _initial_training_stage() -> dict:
     return {
         "train_sequence_crop_size": 256,  # N_res
@@ -439,7 +477,7 @@ def _finetuning_stage() -> dict:
 def _inference_stage(chunk_size: int) -> dict:
     return {
         "max_msa_clusters": 508,  # N_clust
-        "max_extra_msa": 5120,    # N_extra_seq
+        "max_extra_msa": 5120,  # N_extra_seq
         "template_pair_stack_config": {
             "chunk_size_tri_att": chunk_size,
         },
@@ -495,8 +533,6 @@ def _update(left: dict, right: dict) -> dict:
             left[k] = v
     return left
 
-
-# ------------------------------ FEATURE SHAPES ------------------------------ #
 
 FEATURE_SHAPES = {
     "aatype": ("N_res",),

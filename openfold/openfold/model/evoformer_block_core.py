@@ -19,18 +19,18 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 
+from openfold.model.dropout import DropoutColumnwise, DropoutRowwise
 from openfold.model.msa_transition import MSATransition
 from openfold.model.outer_product_mean import OuterProductMean
-from openfold.model.triangular_multiplicative_update import (
-    TriangleMultiplicationOutgoing,
-    TriangleMultiplicationIncoming,
-)
-from openfold.model.triangular_attention import (
-    TriangleAttentionStartingNode,
-    TriangleAttentionEndingNode,
-)
 from openfold.model.pair_transition import PairTransition
-from openfold.model.dropout import DropoutRowwise, DropoutColumnwise
+from openfold.model.triangular_attention import (
+    TriangleAttentionEndingNode,
+    TriangleAttentionStartingNode,
+)
+from openfold.model.triangular_multiplicative_update import (
+    TriangleMultiplicationIncoming,
+    TriangleMultiplicationOutgoing,
+)
 
 
 class EvoformerBlockCore(nn.Module):
@@ -58,6 +58,7 @@ class EvoformerBlockCore(nn.Module):
         chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -126,14 +127,24 @@ class EvoformerBlockCore(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,          # [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation
-        z: torch.Tensor,          # [batch, N_res, N_res, c_z] pair representation
-        msa_mask: torch.Tensor,   # [batch, N_seq, N_res] MSA (or Extra MSA) mask
-        pair_mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-    ) -> Tuple[
-        torch.Tensor,  # m: [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation
-        torch.Tensor,  # z: [batch, N_res, N_res, c_z] pair representation
-    ]:
+        m: torch.Tensor,
+        z: torch.Tensor,
+        msa_mask: torch.Tensor,
+        pair_mask: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Evoformer Block Core forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            msa_mask: [batch, N_seq, N_res] MSA (or Extra MSA) mask
+            pair_mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            m: [batch, N_seq, N_res, c_m] updated MSA (or Extra MSA) representation
+            z: [batch, N_res, N_res, c_z] updated pair representation
+
+        """
         m = m + self.msa_transition(m=m, mask=msa_mask)
         z = z + self.outer_product_mean(m=m, mask=msa_mask)
         z = z + self.tmo_dropout_rowwise(self.tri_mul_out(z=z, mask=pair_mask))

@@ -66,8 +66,9 @@ class PDBDataset(Dataset):
     def __getitem__(self, index_seed_pair: Tuple[int, int]) -> dict:
         if not isinstance(index_seed_pair, tuple):
             raise TypeError(
-                f"__getitem__ expects {tuple} in format (index, seed), but provided"
-                f" {type(index_seed_pair)} argument containing value {repr(index_seed_pair)}"
+                f"__getitem__ expects {tuple} in format (index, seed),"
+                f" but provided {type(index_seed_pair)} argument"
+                f" contains value {repr(index_seed_pair)}"
             )
         index, seed = index_seed_pair
         assert isinstance(index, int)
@@ -342,10 +343,12 @@ def _filter_pdb_chains_for_training(
     is_resolution_below_max = mmcif_chains_df["resolution"] < max_resolution
     is_resolution_nan = mmcif_chains_df["resolution"].isnull()
     is_resolution_acceptable = is_resolution_below_max | is_resolution_nan
-    is_aa_frequency_acceptable = pd.Series([
-        _is_aa_frequency_acceptable(sequence, max_aa_frequency)
-        for sequence in mmcif_chains_df["sequence"].tolist()
-    ])
+    is_aa_frequency_acceptable = pd.Series(
+        [
+            _is_aa_frequency_acceptable(sequence, max_aa_frequency)
+            for sequence in mmcif_chains_df["sequence"].tolist()
+        ]
+    )
     is_in_pdb_clusters = ~mmcif_chains_df["pdb_cluster_id"].eq(-1)
     selector = (
         is_release_date_between
@@ -409,13 +412,17 @@ def _select_cameo_targets_for_validation(
     is_cameo_target = mmcif_chains_df["pdb_chain_id"].isin(selected_cameo_targets)
     mmcif_chains_df = mmcif_chains_df[is_cameo_target].copy()
     # Filter by max sequence length:
-    is_sequence_length_acceptable = mmcif_chains_df["sequence_length"] <= max_sequence_length
+    is_sequence_length_acceptable = (
+        mmcif_chains_df["sequence_length"] <= max_sequence_length
+    )
     mmcif_chains_df = mmcif_chains_df[is_sequence_length_acceptable].copy()
     # Add cameo target column:
-    selected_cameo_targets_df = pd.DataFrame(data={
-        "pdb_chain_id": list(selected_cameo_targets.keys()),
-        "cameo_target_id": list(selected_cameo_targets.values()),
-    })
+    selected_cameo_targets_df = pd.DataFrame(
+        data={
+            "pdb_chain_id": list(selected_cameo_targets.keys()),
+            "cameo_target_id": list(selected_cameo_targets.values()),
+        }
+    )
     mmcif_chains_df = mmcif_chains_df.merge(
         right=selected_cameo_targets_df,
         how="left",
@@ -474,7 +481,8 @@ def _assert_pdb_alignments(
     if not pdb_chain_ids.issubset(alignments_super_index_ids):
         diff = pdb_chain_ids - alignments_super_index_ids
         raise RuntimeError(
-            f"`mmcif_chains_df` has {len(diff)} ids not present in `alignments_super_index`."
+            f"`mmcif_chains_df` has {len(diff)} ids"
+            " not present in `alignments_super_index`."
             f" To filter them out, set `filter_by_alignments` flag."
         )
 

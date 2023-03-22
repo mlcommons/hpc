@@ -17,8 +17,8 @@
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 
 
 class MSATransition(nn.Module):
@@ -31,6 +31,7 @@ class MSATransition(nn.Module):
         n: `c_m` multiplier to obtain hidden dimension (channels).
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -43,9 +44,19 @@ class MSATransition(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_seq, N_res, c_m] MSA representation
-        mask: torch.Tensor,  # [batch, N_seq, N_res] MSA mask
-    ) -> torch.Tensor:       # [batch, N_seq, N_res, c_m] MSA representation update
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """MSA Transition forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA representation
+            mask: [batch, N_seq, N_res] MSA mask
+
+        Returns:
+            m_update: [batch, N_seq, N_res, c_m] MSA representation update
+
+        """
         # DeepMind forgets to apply the MSA mask here.
         m = self.layer_norm(m)
         m = self.linear_1(m)

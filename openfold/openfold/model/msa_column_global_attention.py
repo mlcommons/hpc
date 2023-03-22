@@ -38,6 +38,7 @@ class MSAColumnGlobalAttention(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_e: int,
@@ -60,9 +61,19 @@ class MSAColumnGlobalAttention(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_extra_seq, N_res, c_e] extra MSA representation
-        mask: torch.Tensor,  # [batch, N_extra_seq, N_res] extra MSA mask
-    ) -> torch.Tensor:       # [batch, N_extra_seq, N_res, c_e] extra MSA representation update
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """MSA Column Global Attention forward pass.
+
+        Args:
+            m: [batch, N_extra_seq, N_res, c_e] extra MSA representation
+            mask: [batch, N_extra_seq, N_res] extra MSA mask
+
+        Returns:
+            m_update: [batch, N_extra_seq, N_res, c_e] extra MSA representation update
+
+        """
         m = m.transpose(-2, -3)
         # m: [batch, N_res, N_extra_seq, c_e]
 

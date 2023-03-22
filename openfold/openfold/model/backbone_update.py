@@ -29,6 +29,7 @@ class BackboneUpdate(nn.Module):
         c_s: Single representation dimension (channels).
 
     """
+
     def __init__(self, c_s: int) -> None:
         super(BackboneUpdate, self).__init__()
         self.linear = Linear(c_s, 6, bias=True, init="final")

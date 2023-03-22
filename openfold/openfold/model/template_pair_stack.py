@@ -39,9 +39,11 @@ class TemplatePairStack(nn.Module):
         pair_transition_n: Channel multiplier in pair transition.
         dropout_rate: Dropout rate for pair activations.
         inf: Safe infinity value.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
+
     def __init__(
         self,
         c_t: int,
@@ -55,27 +57,40 @@ class TemplatePairStack(nn.Module):
         chunk_size_tri_att: Optional[int],
     ) -> None:
         super(TemplatePairStack, self).__init__()
-        self.blocks = nn.ModuleList([
-            TemplatePairBlock(
-                c_t=c_t,
-                c_hidden_tri_att=c_hidden_tri_att,
-                c_hidden_tri_mul=c_hidden_tri_mul,
-                num_heads_tri=num_heads_tri,
-                pair_transition_n=pair_transition_n,
-                dropout_rate=dropout_rate,
-                inf=inf,
-                chunk_size_tri_att=chunk_size_tri_att,
-            )
-            for _ in range(num_blocks)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TemplatePairBlock(
+                    c_t=c_t,
+                    c_hidden_tri_att=c_hidden_tri_att,
+                    c_hidden_tri_mul=c_hidden_tri_mul,
+                    num_heads_tri=num_heads_tri,
+                    pair_transition_n=pair_transition_n,
+                    dropout_rate=dropout_rate,
+                    inf=inf,
+                    chunk_size_tri_att=chunk_size_tri_att,
+                )
+                for _ in range(num_blocks)
+            ]
+        )
         self.layer_norm = LayerNorm(c_t)
 
     def forward(
         self,
-        t: torch.tensor,     # [batch, N_templ, N_res, N_res, c_t] template representation
-        mask: torch.tensor,  # [batch, N_res, N_res] pair mask
-        gradient_checkpointing: bool,  # whether to run forward pass with gradient checkpointing
-    ) -> torch.Tensor:       # [batch, N_templ, N_res, N_res, c_t] template representation
+        t: torch.tensor,
+        mask: torch.tensor,
+        gradient_checkpointing: bool,
+    ) -> torch.Tensor:
+        """Template Pair Stack forward pass.
+
+        Args:
+            t: [batch, N_templ, N_res, N_res, c_t] template representation
+            mask: [batch, N_res, N_res] pair mask
+            gradient_checkpointing: whether to use gradient checkpointing
+
+        Returns:
+            t: [batch, N_templ, N_res, N_res, c_t] updated template representation
+
+        """
         if gradient_checkpointing:
             assert torch.is_grad_enabled()
             t = self._forward_blocks_with_gradient_checkpointing(t=t, mask=mask)

@@ -36,6 +36,7 @@ class MSAColumnAttention(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -59,9 +60,19 @@ class MSAColumnAttention(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_seq, N_res, c_m] MSA representation
-        mask: torch.Tensor,  # [batch, N_seq, N_res] MSA mask
-    ) -> torch.Tensor:       # [batch, N_seq, N_res, c_m] MSA representation update
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """MSA Column Attention forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA representation
+            mask: [batch, N_seq, N_res] MSA mask
+
+        Returns:
+            m_update: [batch, N_seq, N_res, c_m] MSA representation update
+
+        """
         m = m.transpose(-2, -3)
         # m: [batch, N_res, N_seq, c_m]
 

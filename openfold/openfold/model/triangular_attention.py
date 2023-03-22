@@ -20,8 +20,8 @@ import torch
 import torch.nn as nn
 
 from openfold.model.attention import Attention
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 
 
 class TriangleAttention(nn.Module):
@@ -38,6 +38,7 @@ class TriangleAttention(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -48,9 +49,7 @@ class TriangleAttention(nn.Module):
         chunk_size: Optional[int],
     ) -> None:
         super(TriangleAttention, self).__init__()
-        # configuration:
         self._is_starting = {"starting": True, "ending": False}[ta_type]
-        # submodules:
         self.layer_norm = LayerNorm(c_z)
         self.linear = Linear(c_z, num_heads, bias=False, init="normal")
         self.mha = Attention(
@@ -66,9 +65,19 @@ class TriangleAttention(nn.Module):
 
     def forward(
         self,
-        z: torch.Tensor,     # [batch, N_res, N_res, c_z] pair representation
-        mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-    ) -> torch.Tensor:       # [batch, N_res, N_res, c_z] pair representation update
+        z: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Triangle Attention forward pass.
+
+        Args:
+            z: [batch, N_res, N_res, c_z] pair representation
+            mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            z_update: [batch, N_res, N_res, c_z] pair representation update
+
+        """
         if not self._is_starting:
             z = z.transpose(-2, -3)
             mask = mask.transpose(-1, -2)
@@ -117,6 +126,7 @@ class TriangleAttentionStartingNode(TriangleAttention):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -149,6 +159,7 @@ class TriangleAttentionEndingNode(TriangleAttention):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_z: int,

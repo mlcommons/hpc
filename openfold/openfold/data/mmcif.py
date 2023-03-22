@@ -123,15 +123,21 @@ def parse_mmcif_string(mmcif_string: str) -> dict:
     exptl_method = _get_exptl_method(mmcif_parser_dict)
     release_date = _get_release_date(mmcif_parser_dict)
     resolution = _get_resolution(mmcif_parser_dict)
-    entity_id_to_mmcif_chain_ids: _EntityIdToChainIds = _get_entity_id_to_chain_ids(mmcif_parser_dict)
-    legal_polymers: _LegalPolymers = _get_legal_polymers(mmcif_parser_dict, entity_id_to_mmcif_chain_ids)
+    entity_id_to_mmcif_chain_ids: _EntityIdToChainIds = _get_entity_id_to_chain_ids(
+        mmcif_parser_dict
+    )
+    legal_polymers: _LegalPolymers = _get_legal_polymers(
+        mmcif_parser_dict, entity_id_to_mmcif_chain_ids
+    )
     if not legal_polymers:
         raise RuntimeError("legal_polymers are empty")
     atom_site_list: _AtomSiteList = _get_atom_site_list(mmcif_parser_dict)
     atom_site_list = _filter_atom_site_list(atom_site_list)
     chain_ids_mapping: _ChainIdsMapping = _get_chain_ids_mapping(atom_site_list)
     sequences: _Sequences = _get_sequences(legal_polymers, chain_ids_mapping)
-    residue_keys: _ResidueKeys = _get_residue_keys(legal_polymers, atom_site_list, chain_ids_mapping)
+    residue_keys: _ResidueKeys = _get_residue_keys(
+        legal_polymers, atom_site_list, chain_ids_mapping
+    )
     author_chain_ids: _AuthorChainIds = list(sequences.keys())
     first_model: PDBModel = _get_first_model(full_structure)
     atoms: _AtomsNumpy = _get_atoms(first_model, author_chain_ids, residue_keys)
@@ -164,7 +170,10 @@ def compress_mmcif_dict_atoms(atoms: _AtomsNumpy) -> _AtomsCompressed:
         all_atom_positions_shape = all_atom_positions_array.shape
         all_atom_mask_shape = all_atom_mask_array.shape
         atoms_compressed[chain_id] = {
-            "all_atom_positions": (all_atom_positions_compressed, all_atom_positions_shape),
+            "all_atom_positions": (
+                all_atom_positions_compressed,
+                all_atom_positions_shape,
+            ),
             "all_atom_mask": (all_atom_mask_compressed, all_atom_mask_shape),
         }
     return atoms_compressed
@@ -173,13 +182,22 @@ def compress_mmcif_dict_atoms(atoms: _AtomsNumpy) -> _AtomsCompressed:
 def decompress_mmcif_dict_atoms(atoms: _AtomsCompressed) -> _AtomsNumpy:
     atoms_decompressed = {}
     for chain_id in atoms.keys():
-        all_atom_positions_compressed, all_atom_positions_shape = atoms[chain_id]["all_atom_positions"]
+        all_atom_positions = atoms[chain_id]["all_atom_positions"]
+        all_atom_positions_compressed, all_atom_positions_shape = all_atom_positions
         all_atom_mask_compressed, all_atom_mask_shape = atoms[chain_id]["all_atom_mask"]
         all_atom_positions_bytearray = zlib.decompress(all_atom_positions_compressed)
         all_atom_mask_bytearray = zlib.decompress(all_atom_mask_compressed)
-        all_atom_positions_array = np.frombuffer(all_atom_positions_bytearray, dtype=np.float32)
-        all_atom_mask_array = np.frombuffer(all_atom_mask_bytearray, dtype=bool)
-        all_atom_positions_array = all_atom_positions_array.reshape(all_atom_positions_shape).copy()
+        all_atom_positions_array = np.frombuffer(
+            buffer=all_atom_positions_bytearray,
+            dtype=np.float32,
+        )
+        all_atom_mask_array = np.frombuffer(
+            buffer=all_atom_mask_bytearray,
+            dtype=bool,
+        )
+        all_atom_positions_array = all_atom_positions_array.reshape(
+            all_atom_positions_shape
+        ).copy()
         all_atom_mask_array = all_atom_mask_array.reshape(all_atom_mask_shape).copy()
         atoms_decompressed[chain_id] = {
             "all_atom_positions": all_atom_positions_array,
@@ -248,7 +266,9 @@ def _get_resolution(mmcif_parser_dict: dict) -> float:
             return float("nan")
 
     resolutions = [_parse_resolution(resolution) for resolution in resolutions]
-    resolutions = [resolution for resolution in resolutions if not math.isnan(resolution)]
+    resolutions = [
+        resolution for resolution in resolutions if not math.isnan(resolution)
+    ]
 
     if len(resolutions) == 1:
         return resolutions[0]
@@ -351,7 +371,8 @@ def _get_chain_ids_mapping(atom_site_list: _AtomSiteList) -> _ChainIdsMapping:
             assert chain_ids_mapping[mmcif_chain_id] == author_chain_id
         else:
             chain_ids_mapping[mmcif_chain_id] = author_chain_id
-    # Return mapping from internal mmCIF chain ids to chain ids used by the authors / Biopython
+    # Return mapping from internal mmCIF chain ids
+    # to chain ids used by the authors / Biopython.
     return chain_ids_mapping
 
 
@@ -409,7 +430,9 @@ def _get_residue_keys(
             if author_chain_id not in residue_keys:
                 residue_keys[author_chain_id] = {}
 
-            residue_index: _ResidueIndex = int(mmcif_seq_num) - seq_start_num[mmcif_chain_id]
+            residue_index: _ResidueIndex = (
+                int(mmcif_seq_num) - seq_start_num[mmcif_chain_id]
+            )
             residue_key: _ResidueKey = (hetflag, int(author_seq_num), insertion_code)
 
             # The original code overrides existing `residue_key` breezily,
@@ -445,7 +468,9 @@ def _get_atoms(
         assert len(chains) == 1
         chain = chains[0]
         num_residues = len(residue_keys[author_chain_id])
-        all_atom_positions = np.zeros([num_residues, rc.ATOM_TYPE_NUM, 3], dtype=np.float32)
+        all_atom_positions = np.zeros(
+            [num_residues, rc.ATOM_TYPE_NUM, 3], dtype=np.float32
+        )
         all_atom_mask = np.zeros([num_residues, rc.ATOM_TYPE_NUM], dtype=bool)
         for residue_index in range(num_residues):
             residue_key = residue_keys[author_chain_id][residue_index]
@@ -473,8 +498,6 @@ def _get_atoms(
 def _assert_sequences_and_atoms(sequences: _Sequences, atoms: _AtomsNumpy) -> None:
     assert sequences.keys() == atoms.keys()
     for author_chain_id in sequences.keys():
+        seqlen = len(sequences[author_chain_id])
         for array_name in atoms[author_chain_id].keys():
-            assert (
-                len(sequences[author_chain_id])
-                == len(atoms[author_chain_id][array_name])
-            )
+            assert seqlen == len(atoms[author_chain_id][array_name])

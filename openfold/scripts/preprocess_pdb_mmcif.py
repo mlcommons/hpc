@@ -37,12 +37,46 @@ NUM_PHYSICAL_CPU_CORES = psutil.cpu_count(logical=False)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pdb_mmcif_dirpath", type=Path, required=True, help="Path to 'pdb_mmcif' data directory. Download it via `scripts/download_pdb_mmcif.sh`.")
-    parser.add_argument("--output_dirpath", type=Path, required=True, help="Path to output directory.")
-    parser.add_argument("--pdb_clusters_by_entity_filepath", type=Path, required=True, help="Path to a cluster file (e.g. PDB40 https://cdn.rcsb.org/resources/sequence/clusters/clusters-by-entity-40.txt).")
-    parser.add_argument("--pdb_obsolete_filepath", type=Path, required=True, help="Path to `obsolete.dat` file. Download it via `scripts/download_pdb_mmcif.sh`.")
-    parser.add_argument("--num_parallel_processes", type=int, default=NUM_PHYSICAL_CPU_CORES, help="Num parallel processes used during preprocessing. Default is equal to num physical CPU cores.")
-    parser.add_argument("--force", action="store_true", help="Whether to override existing output files.")
+    parser.add_argument(
+        "--pdb_mmcif_dirpath",
+        type=Path,
+        required=True,
+        help="""Path to 'pdb_mmcif' data directory.
+        Download it via `scripts/download_pdb_mmcif.sh`.""",
+    )
+    parser.add_argument(
+        "--output_dirpath",
+        type=Path,
+        required=True,
+        help="Path to output directory.",
+    )
+    parser.add_argument(
+        "--pdb_clusters_by_entity_filepath",
+        type=Path,
+        required=True,
+        help="""Path to a cluster file (e.g. PDB40
+        https://cdn.rcsb.org/resources/sequence/clusters/clusters-by-entity-40.txt
+        ).""",
+    )
+    parser.add_argument(
+        "--pdb_obsolete_filepath",
+        type=Path,
+        required=True,
+        help="""Path to `obsolete.dat` file.
+        Download it via `scripts/download_pdb_mmcif.sh`.""",
+    )
+    parser.add_argument(
+        "--num_parallel_processes",
+        type=int,
+        default=NUM_PHYSICAL_CPU_CORES,
+        help="""Num parallel processes used during preprocessing.
+        Default is equal to num physical CPU cores.""",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Whether to override existing output files.",
+    )
     args = parser.parse_args()
     return args
 
@@ -71,7 +105,9 @@ def create_mmcif_dict(
     preprocessing_log = {
         "pdb_id": pdb_id,
         "subdirname": subdirname,
-        "mmcif_gz_path": str(mmcif_gz_filepath.relative_to(mmcif_gz_filepath.parents[2])),
+        "mmcif_gz_path": str(
+            mmcif_gz_filepath.relative_to(mmcif_gz_filepath.parents[2])
+        ),
         "mmcif_gz_size": mmcif_gz_filepath.stat().st_size,
         "loading_time": f"{loading_time:.6f}",
         "mmcif_string_len": len(mmcif_string),
@@ -163,9 +199,13 @@ def create_mmcif_chains(
 
         author_chain_id_to_mmcif_chain_ids = defaultdict(list)
         author_chain_id_to_entity_ids = defaultdict(set)
-        for mmcif_chain_id, author_chain_id in mmcif_dict["mmcif_chain_id_to_author_chain_id"].items():
+
+        mmcif_to_author_mapping = mmcif_dict["mmcif_chain_id_to_author_chain_id"]
+        entity_to_mmcifs_mapping = mmcif_dict["entity_id_to_mmcif_chain_ids"]
+
+        for mmcif_chain_id, author_chain_id in mmcif_to_author_mapping.items():
             author_chain_id_to_mmcif_chain_ids[author_chain_id].append(mmcif_chain_id)
-            for entity_id, mmcif_chain_ids in mmcif_dict["entity_id_to_mmcif_chain_ids"].items():
+            for entity_id, mmcif_chain_ids in entity_to_mmcifs_mapping.items():
                 if mmcif_chain_id in mmcif_chain_ids:
                     author_chain_id_to_entity_ids[author_chain_id].add(entity_id)
 
@@ -185,11 +225,13 @@ def create_mmcif_chains(
             elif len(chain_cluster_ids) == 0:
                 pdb_cluster_id = -1
             else:
-                # should never happen, but when it does, count and take the most common id
+                # should never happen,
+                # but when it does,
+                # count and take the most common id
                 pdb_cluster_id = Counter(chain_cluster_ids).most_common()[0][0]
 
             mmcif_chain = {
-                "pdb_chain_id": pdb_chain_id,  # format: `{pdb_id}_{author_chain_id}``
+                "pdb_chain_id": pdb_chain_id,  # format: `{pdb_id}_{author_chain_id}`
                 "pdb_id": pdb_id,
                 "author_chain_id": author_chain_id,
                 "mmcif_chain_ids": mmcif_chain_ids,
@@ -205,12 +247,20 @@ def create_mmcif_chains(
     return mmcif_chains_df
 
 
-def apply_func_parallel(func: Callable, args_list: List[tuple], num_parallel_processes: int) -> list:
+def apply_func_parallel(
+    func: Callable,
+    args_list: List[tuple],
+    num_parallel_processes: int,
+) -> list:
     if not isinstance(args_list, list):
-        raise TypeError(f"args_list is of type {type(args_list)}, but it should be of type {list}.")
+        raise TypeError(
+            f"args_list is of type {type(args_list)}, but it should be of type {list}."
+        )
     for args in args_list:
         if not isinstance(args, tuple):
-            raise TypeError(f"args is of type {type(args)}, but it should be of type {tuple}.")
+            raise TypeError(
+                f"args is of type {type(args)}, but it should be of type {tuple}."
+            )
 
     if num_parallel_processes > 0:
         async_results = []
@@ -241,17 +291,19 @@ def preprocess_pdb_mmcif(
 ) -> None:
     print("preprocess_pdb_mmcif has started...")
 
-    print(f"pdb_mmcif_dirpath={repr(str(pdb_mmcif_dirpath))}")
-    print(f"output_dirpath={repr(str(output_dirpath))}")
-    print(f"pdb_clusters_by_entity_filepath={repr(str(pdb_clusters_by_entity_filepath))}")
-    print(f"pdb_obsolete_filepath={repr(str(pdb_obsolete_filepath))}")
+    print(f"pdb_mmcif_dirpath={repr(pdb_mmcif_dirpath)}")
+    print(f"output_dirpath={repr(output_dirpath)}")
+    print(f"pdb_clusters_by_entity_filepath={repr(pdb_clusters_by_entity_filepath)}")
+    print(f"pdb_obsolete_filepath={repr(pdb_obsolete_filepath)}")
     print(f"num_parallel_processes={num_parallel_processes}")
     print(f"force={force}")
 
     if not pdb_mmcif_dirpath.exists():
         raise FileNotFoundError(f"{repr(pdb_mmcif_dirpath)} does not exist!")
     if not pdb_clusters_by_entity_filepath.exists():
-        raise FileNotFoundError(f"{repr(pdb_clusters_by_entity_filepath)} does not exist!")
+        raise FileNotFoundError(
+            f"{repr(pdb_clusters_by_entity_filepath)} does not exist!"
+        )
     if not pdb_obsolete_filepath.exists():
         raise FileNotFoundError(f"{repr(pdb_obsolete_filepath)} does not exist!")
 
@@ -261,9 +313,7 @@ def preprocess_pdb_mmcif(
 
     pdb_mmcif_raw_subdirpaths = sorted(list(pdb_mmcif_raw_dirpath.glob("*")))
     pdb_mmcif_raw_subdirpaths = [
-        subdirpath
-        for subdirpath in pdb_mmcif_raw_subdirpaths
-        if subdirpath.is_dir()
+        subdirpath for subdirpath in pdb_mmcif_raw_subdirpaths if subdirpath.is_dir()
     ]
     num_mmcif_gz_files = sum(
         len(list(subdirpath.glob("*.cif.gz")))
@@ -271,7 +321,7 @@ def preprocess_pdb_mmcif(
     )
     print(
         f"Found {len(pdb_mmcif_raw_subdirpaths)} subdirectories"
-        f" inside {repr(str(pdb_mmcif_raw_dirpath))}"
+        f" inside {repr(pdb_mmcif_raw_dirpath)}"
         f" containing {num_mmcif_gz_files} `.cif.gz` files in total."
     )
 
@@ -279,7 +329,7 @@ def preprocess_pdb_mmcif(
 
     pdb_mmcif_dicts_dirpath = output_dirpath / "dicts"
     pdb_mmcif_dicts_dirpath.mkdir(exist_ok=force)
-    print(f"mmcif dicts will be saved to {repr(str(pdb_mmcif_dicts_dirpath))}")
+    print(f"mmcif dicts will be saved to {repr(pdb_mmcif_dicts_dirpath)}")
 
     print("Preprocessing (creating mmcif dicts)...")
     preprocessing_logs_dfs = apply_func_parallel(
@@ -292,7 +342,9 @@ def preprocess_pdb_mmcif(
     )
 
     preprocessing_logs_df = pd.concat(preprocessing_logs_dfs)
-    summary = preprocessing_logs_df["error"].fillna("SUCCESS").value_counts(dropna=False)
+    summary = (
+        preprocessing_logs_df["error"].fillna("SUCCESS").value_counts(dropna=False)
+    )
     header = pd.Series(index=["__num_mmcif_gz_files__"], data=[num_mmcif_gz_files])
     preprocessing_logs_filepath = output_dirpath / "dicts_preprocessing_logs.csv"
     if not force:
@@ -301,7 +353,9 @@ def preprocess_pdb_mmcif(
     print("preprocessing_logs_df.shape", preprocessing_logs_df.shape)
     print("Preprocessing summary:")
     print(pd.concat([header, summary]).to_string())
-    print(f"Preprocessing logs saved to {repr(str(preprocessing_logs_filepath))} successfully!")
+    print(
+        f"Preprocessing logs saved to {repr(preprocessing_logs_filepath)} successfully!"
+    )
 
     pdb_cluster_ids = load_pdb_cluster_ids(pdb_clusters_by_entity_filepath)
     print("Generating mmcif chains...")
@@ -319,7 +373,7 @@ def preprocess_pdb_mmcif(
     if not force:
         assert not pdb_mmcif_chains_filepath.exists()
     mmcif_chains_df.to_csv(pdb_mmcif_chains_filepath, index=False)
-    print(f"mmcif chains saved to {repr(str(pdb_mmcif_chains_filepath))} successfully!")
+    print(f"mmcif chains saved to {repr(pdb_mmcif_chains_filepath)} successfully!")
 
     print("copying pdb obsolete file...")
     src_pdb_obsolete_filepath = pdb_obsolete_filepath
@@ -327,7 +381,9 @@ def preprocess_pdb_mmcif(
     if not force:
         assert not dst_pdb_obsolete_filepath.exists()
     shutil.copyfile(src=src_pdb_obsolete_filepath, dst=dst_pdb_obsolete_filepath)
-    print(f"pdb obsolete file copied to {repr(str(dst_pdb_obsolete_filepath))} successfully!")
+    print(
+        f"pdb obsolete file copied to {repr(dst_pdb_obsolete_filepath)} successfully!"
+    )
 
     print("preprocess_pdb_mmcif finished successfully!")
 

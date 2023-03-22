@@ -19,10 +19,10 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
-from openfold.model.layer_norm import LayerNorm
-from openfold.torch_utils import is_autocast_fp16_enabled
 from openfold.helpers import slice_generator
+from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
+from openfold.torch_utils import is_autocast_fp16_enabled
 
 
 class OuterProductMean(nn.Module):
@@ -38,6 +38,7 @@ class OuterProductMean(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -48,13 +49,11 @@ class OuterProductMean(nn.Module):
     ) -> None:
         super(OuterProductMean, self).__init__()
         assert eps == 1e-3
-        # configuration:
         self.c_m = c_m
         self.c_z = c_z
         self.c_hidden = c_hidden
         self.eps = eps
         self.chunk_size = chunk_size
-        # submodules:
         self.layer_norm = LayerNorm(c_m)
         self.linear_1 = Linear(c_m, c_hidden, bias=True, init="default")
         self.linear_2 = Linear(c_m, c_hidden, bias=True, init="default")
@@ -62,9 +61,19 @@ class OuterProductMean(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_seq, N_res, c_m] MSA representation
-        mask: torch.Tensor,  # [batch, N_seq, N_res] MSA mask
-    ) -> torch.Tensor:       # [batch, N_res, N_res, c_z] pair representation update
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Outer Product Mean forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA representation
+            mask: [batch, N_seq, N_res] MSA mask
+
+        Returns:
+            outer: [batch, N_res, N_res, c_z] pair representation update
+
+        """
         if is_autocast_fp16_enabled():
             with torch.cuda.amp.autocast(enabled=False):
                 return self._forward(m=m.float(), mask=mask)
@@ -122,7 +131,9 @@ class OuterProductMean(nn.Module):
         # outer: [batch, a_N_res, b_N_res, c_z]
         return outer
 
-    def _outer_chunked(self, a: torch.Tensor, b: torch.Tensor, chunk_size: int) -> torch.Tensor:
+    def _outer_chunked(
+        self, a: torch.Tensor, b: torch.Tensor, chunk_size: int
+    ) -> torch.Tensor:
         outer_chunks = []
         subbatch_size = a.size(1)
         for left, right in slice_generator(0, subbatch_size, chunk_size):

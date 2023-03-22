@@ -36,6 +36,7 @@ class TemplatePointwiseAttention(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_t: int,
@@ -59,17 +60,31 @@ class TemplatePointwiseAttention(nn.Module):
 
     def forward(
         self,
-        t: torch.Tensor,              # [batch, N_templ, N_res, N_res, c_t] template representation
-        z: torch.Tensor,              # [batch, N_res, N_res, c_z] pair representation
-        template_mask: torch.Tensor,  # [batch, N_templ] template mask
-    ) -> torch.Tensor:                # [batch, N_res, N_res, c_z] pair representation update
+        t: torch.Tensor,
+        z: torch.Tensor,
+        template_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Template Pointwise Attention forward pass.
+
+        Args:
+            t: [batch, N_templ, N_res, N_res, c_t] template representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            template_mask: [batch, N_templ] template mask
+
+        Returns:
+            z_update: [batch, N_res, N_res, c_z] pair representation update
+                from template representation
+
+        """
         t = t.movedim(-4, -2)
         # t: [batch, N_res, N_res, N_templ, c_t]
 
         z = z.unsqueeze(-2)
         # z: [batch, N_res, N_res, 1, c_z]
 
-        template_mask = template_mask.unsqueeze(-2).unsqueeze(-3).unsqueeze(-4).unsqueeze(-5)
+        template_mask = (
+            template_mask.unsqueeze(-2).unsqueeze(-3).unsqueeze(-4).unsqueeze(-5)
+        )
         # template_mask: [batch, 1, 1, 1, 1, N_templ]
 
         z = self.mha(

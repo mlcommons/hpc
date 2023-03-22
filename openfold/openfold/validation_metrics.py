@@ -69,7 +69,11 @@ def compute_validation_metrics(
             mask=all_atom_mask_ca,  # still required here to compute n
         )
 
-    superimposition_metric_names = {"alignment_rmsd", "gdt_ts", "gdt_ha"} & metrics_names
+    superimposition_metric_names = {
+        "alignment_rmsd",
+        "gdt_ts",
+        "gdt_ha",
+    } & metrics_names
 
     if superimposition_metric_names:
         superimposed_pred, alignment_rmsd = superimpose(
@@ -103,7 +107,6 @@ def drmsd(
     structure_2: torch.Tensor,
     mask: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-
     def prep_d(structure):
         d = structure[..., :, None, :] - structure[..., None, :, :]
         d = d**2

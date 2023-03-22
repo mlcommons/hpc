@@ -347,6 +347,7 @@ RIGID_GROUP_ATOM_POSITIONS = {
     ],
 }
 
+# fmt: off
 # A list of atoms (excluding hydrogen) for each AA type. PDB naming convention.
 RESIDUE_ATOMS = {
     "ALA": ["C", "CA", "CB", "N", "O"],
@@ -370,6 +371,7 @@ RESIDUE_ATOMS = {
     "TYR": ["C", "CA", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "N", "O", "OH"],
     "VAL": ["C", "CA", "CB", "CG1", "CG2", "N", "O"],
 }
+# fmt: on
 
 # Naming swaps for ambiguous atom names.
 # Due to symmetries in the amino acids the naming of atoms is ambiguous in
@@ -436,9 +438,7 @@ def load_stereo_chemical_props() -> Tuple[
         atom1, atom2 = bond.split("-")
         if resname not in residue_bonds:
             residue_bonds[resname] = []
-        residue_bonds[resname].append(
-            Bond(atom1, atom2, float(length), float(stddev))
-        )
+        residue_bonds[resname].append(Bond(atom1, atom2, float(length), float(stddev)))
     residue_bonds["UNK"] = []
 
     # Load bond angles.
@@ -561,8 +561,8 @@ assert len(ATOM_ORDER) == len(ATOM_TYPES)
 ATOM_TYPE_NUM = len(ATOM_TYPES)
 assert ATOM_TYPE_NUM == 37
 
-
-# A compact atom encoding with 14 columns
+# fmt: off
+# A compact atom encoding with 14 columns.
 RESTYPE_NAME_TO_ATOM14_NAMES = {
     "ALA": ["N", "CA", "C", "O", "CB", "", "", "", "", "", "", "", "", ""],
     "ARG": ["N", "CA", "C", "O", "CB", "CG", "CD", "NE", "CZ", "NH1", "NH2", "", "", ""],
@@ -586,6 +586,7 @@ RESTYPE_NAME_TO_ATOM14_NAMES = {
     "VAL": ["N", "CA", "C", "O", "CB", "CG1", "CG2", "", "", "", "", "", "", ""],
     "UNK": ["", "", "", "", "", "", "", "", "", "", "", "", "", ""],
 }
+# fmt: on
 for v in RESTYPE_NAME_TO_ATOM14_NAMES.values():
     assert len(v) == 14
 
@@ -825,10 +826,7 @@ CHI_ATOM_2_ONE_HOT = chi_angle_atom(2)
 # An array like CHI_ANGLES_ATOMS but using indices rather than names.
 CHI_ANGLES_ATOM_INDICES = [CHI_ANGLES_ATOMS[RESTYPE_1TO3[r]] for r in RESTYPES]
 CHI_ANGLES_ATOM_INDICES = [
-    [
-        [ATOM_ORDER[atom_name] for atom_name in list2]
-        for list2 in list1
-    ]
+    [[ATOM_ORDER[atom_name] for atom_name in list2] for list2 in list1]
     for list1 in CHI_ANGLES_ATOM_INDICES
 ]
 CHI_ANGLES_ATOM_INDICES = np.array(
@@ -895,8 +893,7 @@ def _make_rigid_group_constants():
     for restype, restype_letter in enumerate(RESTYPES):
         resname = RESTYPE_1TO3[restype_letter]
         atom_positions = {
-            name: np.array(pos)
-            for name, _, pos in RIGID_GROUP_ATOM_POSITIONS[resname]
+            name: np.array(pos) for name, _, pos in RIGID_GROUP_ATOM_POSITIONS[resname]
         }
 
         # backbone to backbone is the identity transform
@@ -1023,7 +1020,4 @@ _make_atom14_ambiguity_feats()
 
 
 def aatype_to_str_sequence(aatype):
-    return "".join([
-        RESTYPES_WITH_X[aatype[i]]
-        for i in range(len(aatype))
-    ])
+    return "".join([RESTYPES_WITH_X[aatype[i]] for i in range(len(aatype))])

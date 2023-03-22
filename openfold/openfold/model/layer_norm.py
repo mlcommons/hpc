@@ -29,6 +29,7 @@ class LayerNorm(nn.Module):
         eps: A value added to the denominator for numerical stability.
 
     """
+
     def __init__(
         self,
         in_channels: int,

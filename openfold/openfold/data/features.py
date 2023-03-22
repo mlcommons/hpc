@@ -25,7 +25,7 @@ import torch
 
 import openfold.data.residue_constants as rc
 import openfold.data.transforms as data_transforms
-from openfold.config import AlphaFoldConfig, FEATURE_SHAPES
+from openfold.config import FEATURE_SHAPES, AlphaFoldConfig
 from openfold.data.mmcif import zero_center_atom_positions
 from openfold.data.parsers import parse_a3m, parse_hhr
 from openfold.data.templates import TemplateHitFeaturizer
@@ -40,11 +40,19 @@ def create_sequence_features(sequence: str, domain_name: str) -> dict:
         mapping=rc.RESTYPE_ORDER_WITH_X,
         map_unknown_to_x=True,
     )
-    sequence_features["between_segment_residues"] = np.zeros(shape=(seqlen), dtype=np.int32)
-    sequence_features["domain_name"] = np.array([domain_name.encode("utf-8")], dtype=np.object_)
+    sequence_features["between_segment_residues"] = np.zeros(
+        shape=(seqlen), dtype=np.int32
+    )
+    sequence_features["domain_name"] = np.array(
+        [domain_name.encode("utf-8")], dtype=np.object_
+    )
     sequence_features["residue_index"] = np.arange(seqlen, dtype=np.int32)
-    sequence_features["seq_length"] = np.full(shape=(seqlen), fill_value=seqlen, dtype=np.int32)
-    sequence_features["sequence"] = np.array([sequence.encode("utf-8")], dtype=np.object_)
+    sequence_features["seq_length"] = np.full(
+        shape=(seqlen), fill_value=seqlen, dtype=np.int32
+    )
+    sequence_features["sequence"] = np.array(
+        [sequence.encode("utf-8")], dtype=np.object_
+    )
     return sequence_features
 
 
@@ -58,18 +66,28 @@ def create_mmcif_features(
     pdb_chain_id = mmcif_dict["pdb_id"] + author_chain_id
     sequence = mmcif_dict["sequences"][author_chain_id]
 
-    sequence_features = create_sequence_features(sequence=sequence, domain_name=pdb_chain_id)
+    sequence_features = create_sequence_features(
+        sequence=sequence,
+        domain_name=pdb_chain_id,
+    )
     mmcif_features.update(sequence_features)
 
     all_atom_positions = mmcif_dict["atoms"][author_chain_id]["all_atom_positions"]
     all_atom_mask = mmcif_dict["atoms"][author_chain_id]["all_atom_mask"]
     if zero_center:
-        all_atom_positions = zero_center_atom_positions(all_atom_positions, all_atom_mask)
+        all_atom_positions = zero_center_atom_positions(
+            all_atom_positions=all_atom_positions,
+            all_atom_mask=all_atom_mask,
+        )
     mmcif_features["all_atom_positions"] = all_atom_positions.astype(np.float32)
     mmcif_features["all_atom_mask"] = all_atom_mask.astype(np.float32)
 
-    mmcif_features["resolution"] = np.array([mmcif_dict["resolution"]], dtype=np.float32)
-    mmcif_features["release_date"] = np.array([mmcif_dict["release_date"].encode("utf-8")], dtype=np.object_)
+    mmcif_features["resolution"] = np.array(
+        [mmcif_dict["resolution"]], dtype=np.float32
+    )
+    mmcif_features["release_date"] = np.array(
+        [mmcif_dict["release_date"].encode("utf-8")], dtype=np.object_
+    )
     mmcif_features["is_distillation"] = np.array(0.0, dtype=np.float32)
 
     return mmcif_features
@@ -134,7 +152,9 @@ def create_msa_features(
     msa_features = {}
     msa_features["deletion_matrix_int"] = np.array(deletion_matrix, dtype=np.int32)
     msa_features["msa"] = np.array(int_msa, dtype=np.int32)
-    msa_features["num_alignments"] = np.array([num_alignments] * num_res, dtype=np.int32)
+    msa_features["num_alignments"] = np.array(
+        [num_alignments] * num_res, dtype=np.int32
+    )
     return msa_features
 
 
@@ -147,9 +167,13 @@ def process_features(
     assert mode in {"train", "eval", "predict"}
 
     if "deletion_matrix_int" in raw_features:
-        raw_features["deletion_matrix"] = raw_features.pop("deletion_matrix_int").astype(np.float32)
+        deletion_matrix_int = raw_features.pop("deletion_matrix_int")
+        raw_features["deletion_matrix"] = deletion_matrix_int.astype(np.float32)
 
-    raw_feature_names = _get_raw_feature_names(alphafold_config=alphafold_config, mode=mode)
+    raw_feature_names = _get_raw_feature_names(
+        alphafold_config=alphafold_config,
+        mode=mode,
+    )
 
     raw_feature_tensors = {
         raw_feature_name: torch.tensor(array)
@@ -253,29 +277,37 @@ def _nonensembled_transform_fns(
         data_transforms.make_hhblits_profile,
     ]
     if alphafold_config.templates_enabled:
-        transforms.extend([
-            data_transforms.fix_templates_aatype,
-            data_transforms.make_template_mask,
-            data_transforms.make_pseudo_beta("template_"),
-        ])
+        transforms.extend(
+            [
+                data_transforms.fix_templates_aatype,
+                data_transforms.make_template_mask,
+                data_transforms.make_pseudo_beta("template_"),
+            ]
+        )
         if alphafold_config.embed_template_torsion_angles:
-            transforms.extend([
-                data_transforms.atom37_to_torsion_angles("template_"),
-            ])
+            transforms.extend(
+                [
+                    data_transforms.atom37_to_torsion_angles("template_"),
+                ]
+            )
 
-    transforms.extend([
-        data_transforms.make_atom14_masks,
-    ])
+    transforms.extend(
+        [
+            data_transforms.make_atom14_masks,
+        ]
+    )
 
     if mode in {"train", "eval"}:
-        transforms.extend([
-            data_transforms.make_atom14_positions,
-            data_transforms.atom37_to_frames,
-            data_transforms.atom37_to_torsion_angles(""),
-            data_transforms.make_pseudo_beta(""),
-            data_transforms.get_backbone_frames,
-            data_transforms.get_chi_angles,
-        ])
+        transforms.extend(
+            [
+                data_transforms.make_atom14_positions,
+                data_transforms.atom37_to_frames,
+                data_transforms.atom37_to_torsion_angles(""),
+                data_transforms.make_pseudo_beta(""),
+                data_transforms.get_backbone_frames,
+                data_transforms.get_chi_angles,
+            ]
+        )
 
     return transforms
 

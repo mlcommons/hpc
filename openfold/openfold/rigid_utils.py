@@ -209,10 +209,30 @@ def rot_to_quat(
     [[xx, xy, xz], [yx, yy, yz], [zx, zy, zz]] = rot
 
     k = [
-        [ xx + yy + zz,      zy - yz,      xz - zx,      yx - xy,],
-        [      zy - yz, xx - yy - zz,      xy + yx,      xz + zx,],
-        [      xz - zx,      xy + yx, yy - xx - zz,      yz + zy,],
-        [      yx - xy,      xz + zx,      yz + zy, zz - xx - yy,],
+        [
+            xx + yy + zz,
+            zy - yz,
+            xz - zx,
+            yx - xy,
+        ],
+        [
+            zy - yz,
+            xx - yy - zz,
+            xy + yx,
+            xz + zx,
+        ],
+        [
+            xz - zx,
+            xy + yx,
+            yy - xx - zz,
+            yz + zy,
+        ],
+        [
+            yx - xy,
+            xz + zx,
+            yz + zy,
+            zz - xx - yy,
+        ],
     ]
 
     k = (1.0 / 3.0) * torch.stack([torch.stack(t, dim=-1) for t in k], dim=-2)
@@ -222,25 +242,14 @@ def rot_to_quat(
 
 
 _QUAT_MULTIPLY = np.zeros((4, 4, 4))
-_QUAT_MULTIPLY[:, :, 0] = [[ 1, 0, 0, 0],
-                           [ 0,-1, 0, 0],
-                           [ 0, 0,-1, 0],
-                           [ 0, 0, 0,-1]]
 
-_QUAT_MULTIPLY[:, :, 1] = [[ 0, 1, 0, 0],
-                           [ 1, 0, 0, 0],
-                           [ 0, 0, 0, 1],
-                           [ 0, 0,-1, 0]]
+_QUAT_MULTIPLY[:, :, 0] = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]]
 
-_QUAT_MULTIPLY[:, :, 2] = [[ 0, 0, 1, 0],
-                           [ 0, 0, 0,-1],
-                           [ 1, 0, 0, 0],
-                           [ 0, 1, 0, 0]]
+_QUAT_MULTIPLY[:, :, 1] = [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1], [0, 0, -1, 0]]
 
-_QUAT_MULTIPLY[:, :, 3] = [[ 0, 0, 0, 1],
-                           [ 0, 0, 1, 0],
-                           [ 0,-1, 0, 0],
-                           [ 1, 0, 0, 0]]
+_QUAT_MULTIPLY[:, :, 2] = [[0, 0, 1, 0], [0, 0, 0, -1], [1, 0, 0, 0], [0, 1, 0, 0]]
+
+_QUAT_MULTIPLY[:, :, 3] = [[0, 0, 0, 1], [0, 0, 1, 0], [0, -1, 0, 0], [1, 0, 0, 0]]
 
 _QUAT_MULTIPLY_BY_VEC = _QUAT_MULTIPLY[:, 1:, :]
 
@@ -261,11 +270,9 @@ def quat_multiply(quat1, quat2):
     mat = _get_quat("_QUAT_MULTIPLY", dtype=quat1.dtype, device=quat1.device)
     reshaped_mat = mat.view((1,) * len(quat1.shape[:-1]) + mat.shape)
     return torch.sum(
-        reshaped_mat *
-        quat1[..., :, None, None] *
-        quat2[..., None, :, None],
-        dim=(-3, -2)
-      )
+        reshaped_mat * quat1[..., :, None, None] * quat2[..., None, :, None],
+        dim=(-3, -2),
+    )
 
 
 def quat_multiply_by_vec(quat, vec):
@@ -273,10 +280,8 @@ def quat_multiply_by_vec(quat, vec):
     mat = _get_quat("_QUAT_MULTIPLY_BY_VEC", dtype=quat.dtype, device=quat.device)
     reshaped_mat = mat.view((1,) * len(quat.shape[:-1]) + mat.shape)
     return torch.sum(
-        reshaped_mat *
-        quat[..., :, None, None] *
-        vec[..., None, :, None],
-        dim=(-3, -2)
+        reshaped_mat * quat[..., :, None, None] * vec[..., None, :, None],
+        dim=(-3, -2),
     )
 
 
@@ -318,15 +323,15 @@ class Rotation:
             normalize_quats:
                 If quats is specified, whether to normalize quats.
         """
-        if ((rot_mats is None and quats is None) or
-            (rot_mats is not None and quats is not None)):
+        if rot_mats is None and quats is None:
+            raise ValueError("Exactly one input argument must be specified")
+        elif rot_mats is not None and quats is not None:
             raise ValueError("Exactly one input argument must be specified")
 
-        if ((rot_mats is not None and rot_mats.shape[-2:] != (3, 3)) or
-            (quats is not None and quats.shape[-1] != 4)):
-            raise ValueError(
-                "Incorrectly shaped rotation matrix or quaternion"
-            )
+        if rot_mats is not None and rot_mats.shape[-2:] != (3, 3):
+            raise ValueError("Incorrectly shaped rotation matrix or quaternion")
+        elif quats is not None and quats.shape[-1] != 4:
+            raise ValueError("Incorrectly shaped rotation matrix or quaternion")
 
         # Force full-precision
         if quats is not None:
@@ -721,7 +726,7 @@ class Rotation:
 
         return Rotation(rot_mats=rot_mats, quats=None)
 
-    def map_tensor_fn(self, fn: Callable[torch.Tensor, torch.Tensor]) -> Rotation:
+    def map_tensor_fn(self, fn: Callable[[torch.Tensor], torch.Tensor]) -> Rotation:
         """
         Apply a Tensor -> Tensor function to underlying rotation tensors,
         mapping over the rotation dimension(s). Can be used e.g. to sum out
@@ -1075,7 +1080,7 @@ class Rigid:
 
         return Rigid(rot_inv, -1 * trn_inv)
 
-    def map_tensor_fn(self, fn: Callable[torch.Tensor, torch.Tensor]) -> Rigid:
+    def map_tensor_fn(self, fn: Callable[[torch.Tensor], torch.Tensor]) -> Rigid:
         """
         Apply a Tensor -> Tensor function to underlying translation and
         rotation tensors, mapping over the translation/rotation dimensions
@@ -1243,7 +1248,7 @@ class Rigid:
 
         return Rigid(rots, trans)
 
-    def apply_rot_fn(self, fn: Callable[Rotation, Rotation]) -> Rigid:
+    def apply_rot_fn(self, fn: Callable[[Rotation], Rotation]) -> Rigid:
         """
         Applies a Rotation -> Rotation function to the stored rotation
         object.
@@ -1255,7 +1260,7 @@ class Rigid:
         """
         return Rigid(fn(self._rots), self._trans)
 
-    def apply_trans_fn(self, fn: Callable[torch.Tensor, torch.Tensor]) -> Rigid:
+    def apply_trans_fn(self, fn: Callable[[torch.Tensor], torch.Tensor]) -> Rigid:
         """
         Applies a Tensor -> Tensor function to the stored translation.
 

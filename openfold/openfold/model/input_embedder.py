@@ -36,6 +36,7 @@ class InputEmbedder(nn.Module):
         relpos_k: Relative position clip distance.
 
     """
+
     def __init__(
         self,
         tf_dim: int,
@@ -45,14 +46,12 @@ class InputEmbedder(nn.Module):
         relpos_k: int,
     ) -> None:
         super(InputEmbedder, self).__init__()
-        # configuration:
         self.tf_dim = tf_dim
         self.msa_dim = msa_dim
         self.c_z = c_z
         self.c_m = c_m
         self.relpos_k = relpos_k
         self.num_bins = 2 * relpos_k + 1
-        # submodules:
         self.linear_tf_z_i = Linear(tf_dim, c_z, bias=True, init="default")
         self.linear_tf_z_j = Linear(tf_dim, c_z, bias=True, init="default")
         self.linear_tf_m = Linear(tf_dim, c_m, bias=True, init="default")
@@ -61,31 +60,37 @@ class InputEmbedder(nn.Module):
 
     def forward(
         self,
-        target_feat: torch.Tensor,    # [batch, N_res, tf_dim]
-        residue_index: torch.Tensor,  # [batch, N_res]
-        msa_feat: torch.Tensor,       # [batch, N_clust, N_res, msa_dim]
-    ) -> Tuple[
-        torch.Tensor,  # msa_emb:  [batch, N_clust, N_res, c_m]
-        torch.Tensor,  # pair_emb: [batch, N_res, N_res, c_z]
-    ]:
-        """Supplementary '1.5 Input embeddings': Algorithm 3."""
+        target_feat: torch.Tensor,
+        residue_index: torch.Tensor,
+        msa_feat: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Input Embedder forward pass.
 
+        Supplementary '1.5 Input embeddings': Algorithm 3.
+
+        Args:
+            target_feat: [batch, N_res, tf_dim]
+            residue_index: [batch, N_res]
+            msa_feat: [batch, N_clust, N_res, msa_dim]
+
+        Returns:
+            msa_emb: [batch, N_clust, N_res, c_m]
+            pair_emb: [batch, N_res, N_res, c_z]
+
+        """
         tf_emb_i = self.linear_tf_z_i(target_feat)  # a_i
         # tf_emb_i: [batch, N_res, c_z]
 
         tf_emb_j = self.linear_tf_z_j(target_feat)  # b_j
         # tf_emb_j: [batch, N_res, c_z]
 
-        # Version 1 (follows closely Algorithm 3 from the paper):
-        # pair_emb = outer_add(left=tf_emb_i, right=tf_emb_j, dim=-2)  # z_ij = a_i + b_j
-        # pair_emb = pair_emb + self.relpos(residue_index.to(dtype=pair_emb.dtype))
-        # Version 2 (computation rearranged for possible inplace execution)
         pair_emb = self.relpos(residue_index.to(dtype=tf_emb_j.dtype))
         pair_emb = pair_emb + tf_emb_i.unsqueeze(-2)
         pair_emb = pair_emb + tf_emb_j.unsqueeze(-3)
         # pair_emb: [batch, N_res, N_res, c_z]
 
-        msa_emb = self.linear_msa_m(msa_feat) + self.linear_tf_m(target_feat).unsqueeze(-3)
+        msa_emb = self.linear_msa_m(msa_feat)
+        msa_emb = msa_emb + self.linear_tf_m(target_feat).unsqueeze(-3)
         # msa_emb: [batch, N_clust, N_res, c_m]
 
         return msa_emb, pair_emb
@@ -107,7 +112,10 @@ class InputEmbedder(nn.Module):
         return self.linear_relpos(_one_hot_relpos(relative_distances, bins))
 
 
-def _one_hot_relpos(relative_distances: torch.Tensor, bins: torch.Tensor) -> torch.Tensor:
+def _one_hot_relpos(
+    relative_distances: torch.Tensor,
+    bins: torch.Tensor,
+) -> torch.Tensor:
     """One-hot encoding with nearest bin.
 
     Supplementary '1.5 Input embeddings': Algorithm 5.

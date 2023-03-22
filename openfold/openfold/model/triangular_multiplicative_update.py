@@ -17,8 +17,8 @@
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 from openfold.torch_utils import is_autocast_fp16_enabled
 
 
@@ -33,6 +33,7 @@ class TriangleMultiplicativeUpdate(nn.Module):
         tmu_type: "outgoing" or "incoming"
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -40,11 +41,9 @@ class TriangleMultiplicativeUpdate(nn.Module):
         tmu_type: str,
     ) -> None:
         super(TriangleMultiplicativeUpdate, self).__init__()
-        # configuration:
         self.c_z = c_z
         self.c_hidden = c_hidden
         self._is_outgoing = {"outgoing": True, "incoming": False}[tmu_type]
-        # submodules:
         self.linear_a_p = Linear(c_z, c_hidden, bias=True, init="default")
         self.linear_a_g = Linear(c_z, c_hidden, bias=True, init="gating")
         self.linear_b_p = Linear(c_z, c_hidden, bias=True, init="default")
@@ -56,9 +55,19 @@ class TriangleMultiplicativeUpdate(nn.Module):
 
     def forward(
         self,
-        z: torch.Tensor,     # [batch, N_res, N_res, c_z] pair representation
-        mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-    ) -> torch.Tensor:       # [batch, N_res, N_res, c_z] pair representation update
+        z: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Triangle Multiplicative Update forward pass.
+
+        Args:
+            z: [batch, N_res, N_res, c_z] pair representation
+            mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            z_update: [batch, N_res, N_res, c_z] pair representation update
+
+        """
         z = self.layer_norm_in(z)
         # z: [batch, N_res, N_res, c_z]
 
@@ -124,6 +133,7 @@ class TriangleMultiplicationOutgoing(TriangleMultiplicativeUpdate):
         c_hidden: Hidden dimension (channels).
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -147,6 +157,7 @@ class TriangleMultiplicationIncoming(TriangleMultiplicativeUpdate):
         c_hidden: Hidden dimension (channels).
 
     """
+
     def __init__(
         self,
         c_z: int,

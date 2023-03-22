@@ -23,17 +23,19 @@ import torch.nn.functional as F
 
 import openfold.data.residue_constants as rc
 from openfold.config import LossConfig
-from openfold.rigid_utils import Rotation, Rigid
 from openfold.numpy_utils import map_array_tree
+from openfold.rigid_utils import Rigid, Rotation
 from openfold.torch_utils import map_tensor_tree
 
 
+# fmt: off
 class AlphaFoldLoss(nn.Module):
     """AlphaFold loss module.
 
     Supplementary '1.9 Loss functions and auxiliary heads'.
 
     """
+
     def __init__(self, config: LossConfig) -> None:
         super(AlphaFoldLoss, self).__init__()
         self.fape_loss_config = config.fape_loss_config
@@ -49,10 +51,18 @@ class AlphaFoldLoss(nn.Module):
         self,
         outputs: Dict[str, torch.Tensor],
         batch: Dict[str, torch.Tensor],
-    ) -> Tuple[
-        torch.Tensor,             # total loss connected to the graph
-        Dict[str, torch.Tensor],  # loss breakdown detached from the graph
-    ]:
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """AlphaFold loss forward pass.
+
+        Args:
+            outputs: forward pass output dict
+            batch: train batch dict
+
+        Returns:
+            scaled_weighted_total_loss: total loss connected to the graph
+            losses: dict with loss breakdown detached from the graph
+
+        """
         batch_size = batch["aatype"].size(0)
 
         if "violations" not in outputs.keys():
@@ -162,11 +172,15 @@ class AlphaFoldLoss(nn.Module):
 
         weighted_losses = {}
         weighted_losses["fape"] = losses["fape"] * self.fape_loss_config.weight
-        weighted_losses["supervised_chi"] = losses["supervised_chi"] * self.supervised_chi_loss_config.weight
+        weighted_losses["supervised_chi"] = (
+            losses["supervised_chi"] * self.supervised_chi_loss_config.weight
+        )
         weighted_losses["distogram"] = losses["distogram"] * self.distogram_loss_config.weight
         weighted_losses["masked_msa"] = losses["masked_msa"] * self.masked_msa_loss_config.weight
         weighted_losses["plddt_loss"] = losses["plddt_loss"] * self.plddt_loss_config.weight
-        weighted_losses["experimentally_resolved"] = losses["experimentally_resolved"] * self.experimentally_resolved_loss_config.weight
+        weighted_losses["experimentally_resolved"] = (
+            losses["experimentally_resolved"] * self.experimentally_resolved_loss_config.weight
+        )
         weighted_losses["violation"] = losses["violation"] * self.violation_loss_config.weight
         if self.tm_loss_config.enabled:
             weighted_losses["tm"] = losses["tm"] * self.tm_loss_config.weight

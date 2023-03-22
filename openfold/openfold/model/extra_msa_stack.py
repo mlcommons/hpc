@@ -45,11 +45,15 @@ class ExtraMSAStack(nn.Module):
         inf: Safe infinity value.
         eps: Epsilon to prevent division by zero.
         eps_opm: Epsilon to prevent division by zero in outer product mean.
-        chunk_size_msa_att: Optional chunk size for a batch-like dimension in MSA attention.
-        chunk_size_opm: Optional chunk size for a batch-like dimension in outer product mean.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_msa_att: Optional chunk size for a batch-like dimension
+            in MSA attention.
+        chunk_size_opm: Optional chunk size for a batch-like dimension
+            in outer product mean.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
+
     def __init__(
         self,
         c_e: int,
@@ -72,37 +76,52 @@ class ExtraMSAStack(nn.Module):
         chunk_size_tri_att: Optional[int],
     ) -> None:
         super(ExtraMSAStack, self).__init__()
-        self.blocks = nn.ModuleList([
-            ExtraMSABlock(
-                c_e=c_e,
-                c_z=c_z,
-                c_hidden_msa_att=c_hidden_msa_att,
-                c_hidden_opm=c_hidden_opm,
-                c_hidden_tri_mul=c_hidden_tri_mul,
-                c_hidden_tri_att=c_hidden_tri_att,
-                num_heads_msa=num_heads_msa,
-                num_heads_tri=num_heads_tri,
-                transition_n=transition_n,
-                msa_dropout=msa_dropout,
-                pair_dropout=pair_dropout,
-                inf=inf,
-                eps=eps,
-                eps_opm=eps_opm,
-                chunk_size_msa_att=chunk_size_msa_att,
-                chunk_size_opm=chunk_size_opm,
-                chunk_size_tri_att=chunk_size_tri_att,
-            )
-            for _ in range(num_blocks)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                ExtraMSABlock(
+                    c_e=c_e,
+                    c_z=c_z,
+                    c_hidden_msa_att=c_hidden_msa_att,
+                    c_hidden_opm=c_hidden_opm,
+                    c_hidden_tri_mul=c_hidden_tri_mul,
+                    c_hidden_tri_att=c_hidden_tri_att,
+                    num_heads_msa=num_heads_msa,
+                    num_heads_tri=num_heads_tri,
+                    transition_n=transition_n,
+                    msa_dropout=msa_dropout,
+                    pair_dropout=pair_dropout,
+                    inf=inf,
+                    eps=eps,
+                    eps_opm=eps_opm,
+                    chunk_size_msa_att=chunk_size_msa_att,
+                    chunk_size_opm=chunk_size_opm,
+                    chunk_size_tri_att=chunk_size_tri_att,
+                )
+                for _ in range(num_blocks)
+            ]
+        )
 
     def forward(
         self,
-        m: torch.Tensor,          # [batch, N_extra_seq, N_res, c_e] extra MSA representation
-        z: torch.Tensor,          # [batch, N_res, N_res, c_z] pair representation
-        msa_mask: torch.Tensor,   # [batch, N_extra_seq, N_res] extra MSA mask
-        pair_mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-        gradient_checkpointing: bool,  # whether to run forward pass with gradient checkpointing
-    ) -> torch.Tensor:  # z: [batch, N_res, N_res, c_z] updated pair representation
+        m: torch.Tensor,
+        z: torch.Tensor,
+        msa_mask: torch.Tensor,
+        pair_mask: torch.Tensor,
+        gradient_checkpointing: bool,
+    ) -> torch.Tensor:
+        """Extra MSA Stack forward pass.
+
+        Args:
+            m: [batch, N_extra_seq, N_res, c_e] extra MSA representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            msa_mask: [batch, N_extra_seq, N_res] extra MSA mask
+            pair_mask: [batch, N_res, N_res] pair mask
+            gradient_checkpointing: whether to use gradient checkpointing
+
+        Returns:
+            z: [batch, N_res, N_res, c_z] updated pair representation
+
+        """
         if gradient_checkpointing:
             assert torch.is_grad_enabled()
             z = self._forward_blocks_with_gradient_checkpointing(

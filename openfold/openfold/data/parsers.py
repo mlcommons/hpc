@@ -87,7 +87,8 @@ def parse_stockholm(
             * The deletion matrix for the alignment as a list of lists. The element
                 at `deletion_matrix[i][j]` is the number of residues deleted from
                 the aligned sequence i at residue position j.
-            * The names of the targets matched, including the jackhmmer subsequence suffix.
+            * The names of the targets matched, including the jackhmmer subsequence
+                suffix.
 
     """
     name_to_sequence = collections.OrderedDict()
@@ -239,7 +240,8 @@ def _get_hhr_line_regex_groups(
 def _update_hhr_residue_indices_list(
     sequence: str, start_index: int, indices_list: List[int]
 ) -> None:
-    """Computes the relative indices for each residue with respect to the original sequence."""
+    """Computes the relative indices for each residue with respect to
+    the original sequence."""
     counter = start_index
     for symbol in sequence:
         if symbol == "-":

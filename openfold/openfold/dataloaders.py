@@ -90,9 +90,11 @@ class TrainBatchProperties:
         gradient_accumulation_iters: int,
         num_prev_iters: int,
     ) -> None:
-        self._random_num_recycling_iters_iterator = _random_num_recycling_iters_generator(
-            uniform_recycling_iters=uniform_recycling_iters,
-            seed=seed,
+        self._random_num_recycling_iters_iterator = (
+            _random_num_recycling_iters_generator(
+                uniform_recycling_iters=uniform_recycling_iters,
+                seed=seed,
+            )
         )
         assert gradient_accumulation_iters >= 1
         self._gradient_accumulation_iters = gradient_accumulation_iters
@@ -109,7 +111,10 @@ class TrainBatchProperties:
         if (self._iteration - 1) % self._gradient_accumulation_iters == 0:
             self._num_recycling_iters = next(self._random_num_recycling_iters_iterator)
         assert self._num_recycling_iters is not None
-        batch = map_tensor_tree(fn=lambda t: t[..., :self._num_recycling_iters + 1], tree=batch)
+        batch = map_tensor_tree(
+            fn=lambda t: t[..., : self._num_recycling_iters + 1],
+            tree=batch,
+        )
         return batch
 
 

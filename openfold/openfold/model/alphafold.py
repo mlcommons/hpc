@@ -23,19 +23,19 @@ import torch.nn.functional as F
 
 import openfold.data.residue_constants as rc
 from openfold.config import AlphaFoldConfig
+from openfold.model.auxiliary_heads import AuxiliaryHeads
+from openfold.model.evoformer_stack import EvoformerStack
+from openfold.model.extra_msa_embedder import ExtraMSAEmbedder
+from openfold.model.extra_msa_stack import ExtraMSAStack
 from openfold.model.input_embedder import InputEmbedder
 from openfold.model.recycling_embedder import RecyclingEmbedder
+from openfold.model.structure_module import StructureModule
 from openfold.model.template_angle_embedder import TemplateAngleEmbedder
 from openfold.model.template_pair_embedder import TemplatePairEmbedder
 from openfold.model.template_pair_stack import TemplatePairStack
 from openfold.model.template_pointwise_attention import TemplatePointwiseAttention
-from openfold.model.extra_msa_embedder import ExtraMSAEmbedder
-from openfold.model.extra_msa_stack import ExtraMSAStack
-from openfold.model.evoformer_stack import EvoformerStack
-from openfold.model.structure_module import StructureModule
-from openfold.model.auxiliary_heads import AuxiliaryHeads
-from openfold.torch_utils import map_tensor_tree
 from openfold.rigid_utils import Rigid
+from openfold.torch_utils import map_tensor_tree
 
 
 class AlphaFold(nn.Module):
@@ -44,19 +44,40 @@ class AlphaFold(nn.Module):
     Supplementary '1.4 AlphaFold Inference': Algorithm 2.
 
     """
+
     def __init__(self, config: AlphaFoldConfig) -> None:
         super(AlphaFold, self).__init__()
-        self.input_embedder = InputEmbedder(**asdict(config.input_embedder_config))
-        self.recycling_embedder = RecyclingEmbedder(**asdict(config.recycling_embedder_config))
+        self.input_embedder = InputEmbedder(
+            **asdict(config.input_embedder_config),
+        )
+        self.recycling_embedder = RecyclingEmbedder(
+            **asdict(config.recycling_embedder_config),
+        )
         if config.templates_enabled:
-            self.template_angle_embedder = TemplateAngleEmbedder(**asdict(config.template_angle_embedder_config))
-            self.template_pair_embedder = TemplatePairEmbedder(**asdict(config.template_pair_embedder_config))
-            self.template_pair_stack = TemplatePairStack(**asdict(config.template_pair_stack_config))
-            self.template_pointwise_attention = TemplatePointwiseAttention(**asdict(config.template_pointwise_attention_config))
-        self.extra_msa_embedder = ExtraMSAEmbedder(**asdict(config.extra_msa_embedder_config))
-        self.extra_msa_stack = ExtraMSAStack(**asdict(config.extra_msa_stack_config))
-        self.evoformer_stack = EvoformerStack(**asdict(config.evoformer_stack_config))
-        self.structure_module = StructureModule(**asdict(config.structure_module_config))
+            self.template_angle_embedder = TemplateAngleEmbedder(
+                **asdict(config.template_angle_embedder_config),
+            )
+            self.template_pair_embedder = TemplatePairEmbedder(
+                **asdict(config.template_pair_embedder_config),
+            )
+            self.template_pair_stack = TemplatePairStack(
+                **asdict(config.template_pair_stack_config),
+            )
+            self.template_pointwise_attention = TemplatePointwiseAttention(
+                **asdict(config.template_pointwise_attention_config),
+            )
+        self.extra_msa_embedder = ExtraMSAEmbedder(
+            **asdict(config.extra_msa_embedder_config),
+        )
+        self.extra_msa_stack = ExtraMSAStack(
+            **asdict(config.extra_msa_stack_config),
+        )
+        self.evoformer_stack = EvoformerStack(
+            **asdict(config.evoformer_stack_config),
+        )
+        self.structure_module = StructureModule(
+            **asdict(config.structure_module_config),
+        )
         self.auxiliary_heads = AuxiliaryHeads(config.auxiliary_heads_config)
         self.config = config
 
@@ -100,10 +121,7 @@ class AlphaFold(nn.Module):
         feats: Dict[str, torch.Tensor],
         prevs: Dict[str, torch.Tensor],
         gradient_checkpointing: bool,
-    ) -> Tuple[
-        Dict[str, torch.Tensor],  # outputs
-        Dict[str, torch.Tensor],  # prevs
-    ]:
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         outputs = {}
 
         batch_size = feats["aatype"].shape[0]
@@ -192,10 +210,10 @@ class AlphaFold(nn.Module):
 
             del template_feats, template_embeds
 
-        N_seq = m.shape[1]
+        # N_seq = m.shape[1]
 
         # Embed extra MSA features and merge with pairwise embeddings:
-        N_extra_seq = feats["extra_msa"].shape[1]
+        # N_extra_seq = feats["extra_msa"].shape[1]
         a = self.extra_msa_embedder(_build_extra_msa_feat(feats))
         # a: [batch, N_extra_seq, N_res, c_e]
         z = self.extra_msa_stack(
@@ -352,12 +370,15 @@ def _build_template_pair_feat(
         dim=-1,
         keepdim=True,
     )
-    lower = torch.linspace(
-        start=min_bin,
-        end=max_bin,
-        steps=num_bins,
-        device=tpb.device,
-    ) ** 2
+    lower = (
+        torch.linspace(
+            start=min_bin,
+            end=max_bin,
+            steps=num_bins,
+            device=tpb.device,
+        )
+        ** 2
+    )
     upper = torch.cat([lower[1:], lower.new_tensor([inf])], dim=-1)
     dgram = ((dgram > lower) * (dgram < upper)).to(dtype=dgram.dtype)
 
@@ -417,7 +438,9 @@ def _build_template_angle_feat(feats: Dict[str, torch.Tensor]) -> torch.Tensor:
         [
             F.one_hot(input=template_aatype, num_classes=22),
             torsion_angles_sin_cos.reshape(*torsion_angles_sin_cos.shape[:-2], 14),
-            alt_torsion_angles_sin_cos.reshape(*alt_torsion_angles_sin_cos.shape[:-2], 14),
+            alt_torsion_angles_sin_cos.reshape(
+                *alt_torsion_angles_sin_cos.shape[:-2], 14
+            ),
             torsion_angles_mask,
         ],
         dim=-1,

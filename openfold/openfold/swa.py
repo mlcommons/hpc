@@ -48,7 +48,8 @@ def swa_avg_fn(
     model_parameter: torch.Tensor,
     num_averaged: torch.Tensor,
 ) -> torch.Tensor:
-    """Averaging function for EMA with decay 0.999 (Supplementary '1.11.7 Evaluator setup')."""
+    """Averaging function for EMA with decay 0.999
+    (Supplementary '1.11.7 Evaluator setup')."""
     # return averaged_model_parameter * 0.999 + model_parameter * 0.001
     # avg * 0.999 + m * 0.001
     # 999*avg/1000 + m/1000
@@ -57,4 +58,6 @@ def swa_avg_fn(
     # 1000*avg/1000 - avg/1000 + m/1000
     # avg + (m - avg)/1000
     # avg + (m - avg)*0.001
-    return averaged_model_parameter + (model_parameter - averaged_model_parameter) * 0.001
+    return (
+        averaged_model_parameter + (model_parameter - averaged_model_parameter) * 0.001
+    )

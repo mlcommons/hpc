@@ -21,8 +21,8 @@ import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint as gradient_checkpointing_fn
 
-from openfold.model.linear import Linear
 from openfold.model.evoformer_block import EvoformerBlock
+from openfold.model.linear import Linear
 
 
 class EvoformerStack(nn.Module):
@@ -46,11 +46,15 @@ class EvoformerStack(nn.Module):
         pair_dropout: Dropout rate for pair activations.
         inf: Safe infinity value.
         eps_opm: Epsilon to prevent division by zero in outer product mean.
-        chunk_size_msa_att: Optional chunk size for a batch-like dimension in MSA attention.
-        chunk_size_opm: Optional chunk size for a batch-like dimension in outer product mean.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_msa_att: Optional chunk size for a batch-like dimension
+            in MSA attention.
+        chunk_size_opm: Optional chunk size for a batch-like dimension
+            in outer product mean.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -73,41 +77,54 @@ class EvoformerStack(nn.Module):
         chunk_size_tri_att: Optional[int],
     ) -> None:
         super(EvoformerStack, self).__init__()
-        self.blocks = nn.ModuleList([
-            EvoformerBlock(
-                c_m=c_m,
-                c_z=c_z,
-                c_hidden_msa_att=c_hidden_msa_att,
-                c_hidden_opm=c_hidden_opm,
-                c_hidden_tri_mul=c_hidden_tri_mul,
-                c_hidden_tri_att=c_hidden_tri_att,
-                num_heads_msa=num_heads_msa,
-                num_heads_tri=num_heads_tri,
-                transition_n=transition_n,
-                msa_dropout=msa_dropout,
-                pair_dropout=pair_dropout,
-                inf=inf,
-                eps_opm=eps_opm,
-                chunk_size_msa_att=chunk_size_msa_att,
-                chunk_size_opm=chunk_size_opm,
-                chunk_size_tri_att=chunk_size_tri_att,
-            )
-            for _ in range(num_blocks)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                EvoformerBlock(
+                    c_m=c_m,
+                    c_z=c_z,
+                    c_hidden_msa_att=c_hidden_msa_att,
+                    c_hidden_opm=c_hidden_opm,
+                    c_hidden_tri_mul=c_hidden_tri_mul,
+                    c_hidden_tri_att=c_hidden_tri_att,
+                    num_heads_msa=num_heads_msa,
+                    num_heads_tri=num_heads_tri,
+                    transition_n=transition_n,
+                    msa_dropout=msa_dropout,
+                    pair_dropout=pair_dropout,
+                    inf=inf,
+                    eps_opm=eps_opm,
+                    chunk_size_msa_att=chunk_size_msa_att,
+                    chunk_size_opm=chunk_size_opm,
+                    chunk_size_tri_att=chunk_size_tri_att,
+                )
+                for _ in range(num_blocks)
+            ]
+        )
         self.linear = Linear(c_m, c_s, bias=True, init="default")
 
     def forward(
         self,
-        m: torch.Tensor,          # [batch, N_seq, N_res, c_m] MSA representation
-        z: torch.Tensor,          # [batch, N_res, N_res, c_z] pair representation
-        msa_mask: torch.Tensor,   # [batch, N_seq, N_res] MSA mask
-        pair_mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-        gradient_checkpointing: bool,  # whether to run forward pass with gradient checkpointing
-    ) -> Tuple[
-        torch.Tensor,  # m: [batch, N_seq, N_res, c_m] MSA representation
-        torch.Tensor,  # z: [batch, N_res, N_res, c_z] pair representation
-        torch.Tensor,  # s: [batch, N_res, c_s] single representation
-    ]:
+        m: torch.Tensor,
+        z: torch.Tensor,
+        msa_mask: torch.Tensor,
+        pair_mask: torch.Tensor,
+        gradient_checkpointing: bool,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Evoformer Stack forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            msa_mask: [batch, N_seq, N_res] MSA mask
+            pair_mask: [batch, N_res, N_res] pair mask
+            gradient_checkpointing: whether to use gradient checkpointing
+
+        Returns:
+            m: [batch, N_seq, N_res, c_m] updated MSA representation
+            z: [batch, N_res, N_res, c_z] updated pair representation
+            s: [batch, N_res, c_s] single representation
+
+        """
         if gradient_checkpointing:
             assert torch.is_grad_enabled()
             m, z = self._forward_blocks_with_gradient_checkpointing(

@@ -32,6 +32,7 @@ class ExtraMSAEmbedder(nn.Module):
         c_e: Output extra MSA representation dimension (channels).
 
     """
+
     def __init__(
         self,
         emsa_dim: int,
@@ -42,6 +43,15 @@ class ExtraMSAEmbedder(nn.Module):
 
     def forward(
         self,
-        extra_msa_feat: torch.Tensor,  # [batch, N_extra_seq, N_res, emsa_dim]
-    ) -> torch.Tensor:                 # [batch, N_extra_seq, N_res, c_e]
+        extra_msa_feat: torch.Tensor,
+    ) -> torch.Tensor:
+        """Extra MSA Embedder forward pass.
+
+        Args:
+            extra_msa_feat: [batch, N_extra_seq, N_res, emsa_dim]
+
+        Returns:
+            extra_msa_embedding: [batch, N_extra_seq, N_res, c_e]
+
+        """
         return self.linear(extra_msa_feat)

@@ -17,8 +17,8 @@
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 
 
 class PairTransition(nn.Module):
@@ -31,6 +31,7 @@ class PairTransition(nn.Module):
         n: `c_z` multiplier to obtain hidden dimension (channels).
 
     """
+
     def __init__(
         self,
         c_z: int,
@@ -43,9 +44,19 @@ class PairTransition(nn.Module):
 
     def forward(
         self,
-        z: torch.Tensor,     # [batch, N_res, N_res, c_z] pair representation
-        mask: torch.Tensor,  # [batch, N_res, N_res] pair mask
-    ) -> torch.Tensor:       # [batch, N_res, N_res, c_z] pair representation update
+        z: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Pair Transition forward pass.
+
+        Args:
+            z: [batch, N_res, N_res, c_z] pair representation
+            mask: [batch, N_res, N_res] pair mask
+
+        Returns:
+            z_update: [batch, N_res, N_res, c_z] pair representation update
+
+        """
         # DeepMind forgets to apply the MSA mask here.
         z = self.layer_norm(z)
         z = self.linear_1(z)

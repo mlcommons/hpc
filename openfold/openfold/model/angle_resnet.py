@@ -35,6 +35,7 @@ class AngleResnet(nn.Module):
         eps: Epsilon to prevent division by zero.
 
     """
+
     def __init__(
         self,
         c_s: int,
@@ -44,28 +45,34 @@ class AngleResnet(nn.Module):
         eps: float,
     ) -> None:
         super(AngleResnet, self).__init__()
-        # configuration:
         self.c_s = c_s
         self.c_hidden = c_hidden
         self.num_blocks = num_blocks
         self.num_angles = num_angles
         self.eps = eps
-        # submodules:
         self.linear_in = Linear(c_s, c_hidden, bias=True, init="default")
         self.linear_initial = Linear(c_s, c_hidden, bias=True, init="default")
-        self.layers = nn.ModuleList([
-            AngleResnetBlock(c_hidden=c_hidden) for _ in range(num_blocks)
-        ])
+        self.layers = nn.ModuleList(
+            [AngleResnetBlock(c_hidden=c_hidden) for _ in range(num_blocks)]
+        )
         self.linear_out = Linear(c_hidden, num_angles * 2, bias=True, init="default")
 
     def forward(
         self,
-        s: torch.Tensor,          # [batch, N_res, c_s] single representation
-        s_initial: torch.Tensor,  # [batch, N_res, c_s] initial single representation
-    ) -> Tuple[
-        torch.Tensor,  # unnormalized_angles: [batch, N_res, num_angles, 2]
-        torch.Tensor,  # angles: [batch, N_res, num_angles, 2]
-    ]:
+        s: torch.Tensor,
+        s_initial: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Angle Resnet forward pass.
+
+        Args:
+            s: [batch, N_res, c_s] single representation
+            s_initial: [batch, N_res, c_s] initial single representation
+
+        Returns:
+            unnormalized_angles: [batch, N_res, num_angles, 2]
+            angles: [batch, N_res, num_angles, 2]
+
+        """
         # The ReLU's applied to the inputs are absent from the supplement
         # pseudocode but present in the source. For maximal compatibility with
         # the pretrained weights, I'm going with the source.
@@ -85,7 +92,7 @@ class AngleResnet(nn.Module):
         s = s.view(s.shape[:-1] + (self.num_angles, 2))
         # s: [batch, N_res, num_angles, 2]
 
-        unnormalized_s = s
+        unnormalized_angles = s
         # unnormalized_angles: [batch, N_res, num_angles, 2]
 
         norm_denom = torch.sqrt(
@@ -94,10 +101,10 @@ class AngleResnet(nn.Module):
                 min=self.eps,
             )
         )
-        s = s / norm_denom
-        # s: [batch, N_res, num_angles, 2]
+        angles = s / norm_denom
+        # angles: [batch, N_res, num_angles, 2]
 
-        return unnormalized_s, s
+        return unnormalized_angles, angles
 
 
 class AngleResnetBlock(nn.Module):

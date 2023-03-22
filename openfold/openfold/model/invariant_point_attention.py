@@ -41,6 +41,7 @@ class InvariantPointAttention(nn.Module):
         eps: Epsilon to prevent division by zero.
 
     """
+
     def __init__(
         self,
         c_s: int,
@@ -53,7 +54,6 @@ class InvariantPointAttention(nn.Module):
         eps: float,
     ) -> None:
         super(InvariantPointAttention, self).__init__()
-        # configuration:
         self.c_s = c_s
         self.c_z = c_z
         self.c_hidden = c_hidden
@@ -62,10 +62,10 @@ class InvariantPointAttention(nn.Module):
         self.num_v_points = num_v_points
         self.inf = inf
         self.eps = eps
-        # submodules:
         # These linear layers differ from their specifications in the supplement.
         # There, they lack bias and use Glorot initialization.
-        # Here as in the official source, they have bias and use the default Lecun initialization.
+        # Here as in the official source, they have bias
+        # and use the default Lecun initialization.
         hc = c_hidden * num_heads
         self.linear_q = Linear(c_s, hc, bias=True, init="default")
         self.linear_kv = Linear(c_s, 2 * hc, bias=True, init="default")
@@ -86,12 +86,23 @@ class InvariantPointAttention(nn.Module):
 
     def forward(
         self,
-        s: torch.Tensor,     # [batch, N_res, c_s] single representation
-        z: torch.Tensor,     # [batch, N_res, N_res, c_z] pair representation
-        r: Rigid,            # [batch, N_res] rigids transformation
-        mask: torch.Tensor,  # [batch, N_res] sequence mask
-    ) -> torch.Tensor:       # [batch, N_res, c_s] single representation update
+        s: torch.Tensor,
+        z: torch.Tensor,
+        r: Rigid,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Invariant Point Attention (IPA) forward pass.
 
+        Args:
+            s: [batch, N_res, c_s] single representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            r: [batch, N_res] rigids transformation
+            mask: [batch, N_res] sequence mask
+
+        Returns:
+            s_update: [batch, N_res, c_s] single representation update
+
+        """
         #######################################
         # Generate scalar and point activations
         #######################################
@@ -131,10 +142,15 @@ class InvariantPointAttention(nn.Module):
         kv_pts = r[..., None].apply(kv_pts)
         # kv_pts: [batch, N_res, num_heads * (num_qk_points + num_v_points), 3]
 
-        kv_pts = kv_pts.view(kv_pts.shape[:-2] + (self.num_heads, self.num_qk_points + self.num_v_points, 3))
+        kv_pts = kv_pts.view(
+            kv_pts.shape[:-2]
+            + (self.num_heads, self.num_qk_points + self.num_v_points, 3)
+        )
         # kv_pts: [batch, N_res, num_heads, (num_qk_points + num_v_points), 3]
 
-        k_pts, v_pts = torch.split(kv_pts, (self.num_qk_points, self.num_v_points), dim=-2)
+        k_pts, v_pts = torch.split(
+            kv_pts, (self.num_qk_points, self.num_v_points), dim=-2
+        )
         # k_pts: [batch, N_res, num_heads, num_qk_points, 3]
         # v_pts: [batch, N_res, num_heads, num_v_points, 3]
 
@@ -170,7 +186,9 @@ class InvariantPointAttention(nn.Module):
 
         head_weights = F.softplus(self.head_weights)
         head_weights = head_weights.view((1,) * (pt_att.ndim - 2) + (self.num_heads, 1))
-        head_weights = head_weights * math.sqrt(1.0 / (3 * (self.num_qk_points * 9.0 / 2)))
+        head_weights = head_weights * math.sqrt(
+            1.0 / (3 * (self.num_qk_points * 9.0 / 2))
+        )
         # head_weights: [1, 1, 1, num_heads, 1]
 
         pt_att = pt_att * head_weights
@@ -221,7 +239,9 @@ class InvariantPointAttention(nn.Module):
         # o_pt: [batch, N_res, num_heads, num_v_points, 3]
 
         o_pt_norm = torch.sqrt(torch.sum(o_pt**2, dim=-1) + self.eps)
-        o_pt_norm = o_pt_norm.reshape(o_pt_norm.shape[:-2] + (self.num_heads * self.num_v_points,))
+        o_pt_norm = o_pt_norm.reshape(
+            o_pt_norm.shape[:-2] + (self.num_heads * self.num_v_points,)
+        )
         # o_pt_norm: [batch, N_res, num_heads * num_v_points]
 
         o_pt = o_pt.reshape(o_pt.shape[:-3] + (self.num_heads * self.num_v_points, 3))
@@ -237,10 +257,10 @@ class InvariantPointAttention(nn.Module):
         o_cat = torch.cat(o_cat, dim=-1)
         # o_cat: [batch, N_res, num_heads * (c_hidden + num_v_points * 4 + c_z)]
 
-        s = self.linear_out(o_cat.to(dtype=z.dtype))
-        # s: [batch, N_res, c_s]
+        s_update = self.linear_out(o_cat.to(dtype=z.dtype))
+        # s_update: [batch, N_res, c_s]
 
-        return s
+        return s_update
 
 
 def ipa_point_weights_init_(weights_data: torch.Tensor) -> None:

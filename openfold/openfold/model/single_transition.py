@@ -17,8 +17,8 @@
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
 
 
 class SingleTransition(nn.Module):
@@ -31,6 +31,7 @@ class SingleTransition(nn.Module):
         dropout_rate: Dropout rate.
 
     """
+
     def __init__(
         self,
         c_s: int,

@@ -38,6 +38,7 @@ class MSARowAttentionWithPairBias(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_m: int,
@@ -64,10 +65,22 @@ class MSARowAttentionWithPairBias(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation
-        z: torch.Tensor,     # [batch, N_res, N_res, c_z] pair representation
-        mask: torch.Tensor,  # [batch, N_seq, N_res] MSA (or Extra MSA) mask
-    ) -> torch.Tensor:       # [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation update
+        m: torch.Tensor,
+        z: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """MSA Row Attention With Pair Bias forward pass.
+
+        Args:
+            m: [batch, N_seq, N_res, c_m] MSA (or Extra MSA) representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            mask: [batch, N_seq, N_res] MSA (or Extra MSA) mask
+
+        Returns:
+            m_update: [batch, N_seq, N_res, c_m]
+                MSA (or Extra MSA) representation update
+
+        """
         mask = mask.unsqueeze(-2).unsqueeze(-3)
         # mask: [batch, N_seq, 1, 1, N_res]
 

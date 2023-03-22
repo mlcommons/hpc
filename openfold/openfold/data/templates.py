@@ -119,8 +119,8 @@ class TemplateHitFeaturizer:
         )
 
         if self.shuffle_top_k_prefiltered is not None:
-            top = prefiltered_template_hits[:self.shuffle_top_k_prefiltered]
-            bottom = prefiltered_template_hits[self.shuffle_top_k_prefiltered:]
+            top = prefiltered_template_hits[: self.shuffle_top_k_prefiltered]
+            bottom = prefiltered_template_hits[self.shuffle_top_k_prefiltered :]
             shuffling_rng = random.Random(shuffling_seed)
             shuffling_rng.shuffle(top)
             prefiltered_template_hits = top + bottom
@@ -315,7 +315,9 @@ def _check_if_template_hit_is_acceptable(
     if query_pdb_id is not None:
         if template_hit_pdb_id.lower() == query_pdb_id.lower():
             # Template PDB ID identical to query PDB ID
-            rejection_message = f"template == query;{template_hit_pdb_id};{query_pdb_id}"
+            rejection_message = (
+                f"template == query;{template_hit_pdb_id};{query_pdb_id}"
+            )
             return False, rejection_message
 
     if template_hit_pdb_id in pdb_release_dates:
@@ -345,8 +347,7 @@ def _check_if_template_hit_is_acceptable(
     # Check whether the template is a large subsequence or duplicate of original query.
     # This can happen due to duplicate entries in the PDB database.
     is_duplicate = (
-        template_sequence in query_sequence
-        and length_ratio > max_subsequence_ratio
+        template_sequence in query_sequence and length_ratio > max_subsequence_ratio
     )
     if is_duplicate:
         # Template is an exact subsequence of query with large coverage
@@ -370,7 +371,9 @@ def _get_pdb_id_and_chain_id(template_hit: TemplateHit) -> Tuple[str, str]:
     id_match = re.match(r"[a-zA-Z\d]{4}_[a-zA-Z0-9.]+", template_hit.name)
     if not id_match:
         # Fail hard if we can't get the PDB ID and chain name from the hit.
-        raise ValueError(f"hit.name did not start with PDBID_chain: {template_hit.name}")
+        raise ValueError(
+            f"hit.name did not start with PDBID_chain: {template_hit.name}"
+        )
     pdb_id, chain_id = id_match.group(0).split("_")
     return pdb_id.lower(), chain_id
 
@@ -426,7 +429,9 @@ def _featurize_template_hit(
         pdb_id=template_hit_pdb_id,
     )
 
-    template_hit_releaste_date = datetime_from_string(mmcif_dict["release_date"], "%Y-%m-%d")
+    template_hit_releaste_date = datetime_from_string(
+        mmcif_dict["release_date"], "%Y-%m-%d"
+    )
     assert template_hit_releaste_date <= max_template_date
 
     try:
@@ -671,13 +676,17 @@ def _extract_template_features(
 
     output_template_sequence = "".join(output_template_sequence)
 
-    template_aatype = rc.sequence_to_onehot(output_template_sequence, rc.HHBLITS_AA_TO_ID)
+    template_aatype = rc.sequence_to_onehot(
+        output_template_sequence, rc.HHBLITS_AA_TO_ID
+    )
 
     template_features = {
         "template_domain_names": f"{template_id}",
         "template_sequence": output_template_sequence,
         "template_aatype": np.array(template_aatype, dtype=np.int32),
-        "template_all_atom_positions": np.array(template_all_atom_positions, dtype=np.float32),
+        "template_all_atom_positions": np.array(
+            template_all_atom_positions, dtype=np.float32
+        ),
         "template_all_atom_mask": np.array(template_all_atom_mask, dtype=np.float32),
     }
 
@@ -760,7 +769,10 @@ def _get_atom_positions(
     all_atom_positions = mmcif_dict["atoms"][auth_chain_id]["all_atom_positions"]
     all_atom_mask = mmcif_dict["atoms"][auth_chain_id]["all_atom_mask"]
     if zero_center:
-        all_atom_positions = zero_center_atom_positions(all_atom_positions, all_atom_mask)
+        all_atom_positions = zero_center_atom_positions(
+            all_atom_positions=all_atom_positions,
+            all_atom_mask=all_atom_mask,
+        )
     all_atom_mask = all_atom_mask.astype(np.float32)
     _check_residue_distances(
         all_atom_positions=all_atom_positions,

@@ -72,7 +72,7 @@ python scripts/preprocess_open_protein_set.py \
 
 The above will produce 616 GiB (~1k files).
 
-## Training command:
+## Training command
 
 Single GPU training command example:
 

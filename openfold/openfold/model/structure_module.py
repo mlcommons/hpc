@@ -21,13 +21,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import openfold.data.residue_constants as rc
-from openfold.model.linear import Linear
-from openfold.model.layer_norm import LayerNorm
-from openfold.model.invariant_point_attention import InvariantPointAttention
-from openfold.model.single_transition import SingleTransition
-from openfold.model.backbone_update import BackboneUpdate
 from openfold.model.angle_resnet import AngleResnet
-from openfold.rigid_utils import Rotation, Rigid
+from openfold.model.backbone_update import BackboneUpdate
+from openfold.model.invariant_point_attention import InvariantPointAttention
+from openfold.model.layer_norm import LayerNorm
+from openfold.model.linear import Linear
+from openfold.model.single_transition import SingleTransition
+from openfold.rigid_utils import Rigid, Rotation
 
 
 class StructureModule(nn.Module):
@@ -52,6 +52,7 @@ class StructureModule(nn.Module):
         eps: Epsilon to prevent division by zero.
 
     """
+
     def __init__(
         self,
         c_s: int,
@@ -70,7 +71,6 @@ class StructureModule(nn.Module):
         eps: float,
     ) -> None:
         super(StructureModule, self).__init__()
-        # configuration:
         self.c_s = c_s
         self.c_z = c_z
         self.c_hidden_ipa = c_hidden_ipa
@@ -85,7 +85,6 @@ class StructureModule(nn.Module):
         self.scale_factor = scale_factor
         self.inf = inf
         self.eps = eps
-        # submodules:
         self.layer_norm_s = LayerNorm(c_s)
         self.layer_norm_z = LayerNorm(c_z)
         self.linear_in = Linear(c_s, c_s, bias=True, init="default")
@@ -123,11 +122,30 @@ class StructureModule(nn.Module):
 
     def forward(
         self,
-        s: torch.Tensor,       # [batch, N_res, c_s] single representation
-        z: torch.Tensor,       # [batch, N_res, N_res, c_z] pair representation
-        mask: torch.Tensor,    # [batch, N_res] sequence mask
-        aatype: torch.Tensor,  # [batch, N_res] amino acid indices
+        s: torch.Tensor,
+        z: torch.Tensor,
+        mask: torch.Tensor,
+        aatype: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
+        """Structure Module forward pass.
+
+        Args:
+            s: [batch, N_res, c_s] single representation
+            z: [batch, N_res, N_res, c_z] pair representation
+            mask: [batch, N_res] sequence mask
+            aatype: [batch, N_res] amino acid indices
+
+        Returns:
+            dictionary containing:
+                "sm_frames": [batch, num_blocks, N_res, 7]
+                "sm_sidechain_frames": [batch, num_blocks, N_res, 8, 4, 4]
+                "sm_unnormalized_angles": [batch, num_blocks, N_res, 7, 2]
+                "sm_angles": [batch, num_blocks, N_res, 7, 2]
+                "sm_positions": [batch, num_blocks, N_res, 14, 3]
+                "sm_states": [batch, num_blocks, N_res, c_s]
+                "sm_single": [batch, N_res, c_s] updated single representation
+
+        """
         self._initialize_buffers(dtype=s.dtype, device=s.device)
 
         s = self.layer_norm_s(s)
@@ -292,9 +310,7 @@ def _torsion_angles_to_frames(
     bb_rot[..., 1] = 1
 
     # [*, N, 8, 2]
-    alpha = torch.cat(
-        [bb_rot.expand(*alpha.shape[:-2], -1, -1), alpha], dim=-2
-    )
+    alpha = torch.cat([bb_rot.expand(*alpha.shape[:-2], -1, -1), alpha], dim=-2)
 
     # [*, N, 8, 3, 3]
     # Produces rotation matrices of the form:
@@ -350,7 +366,7 @@ def _frames_and_literature_positions_to_atom14_pos(
 ) -> torch.Tensor:
 
     # [*, N, 14, 4, 4]
-    default_4x4 = default_frames[aatype, ...]
+    # default_4x4 = default_frames[aatype, ...]
 
     # [*, N, 14]
     group_mask = group_idx[aatype, ...]
@@ -365,9 +381,7 @@ def _frames_and_literature_positions_to_atom14_pos(
     t_atoms_to_global = r[..., None, :] * group_mask
 
     # [*, N, 14]
-    t_atoms_to_global = t_atoms_to_global.map_tensor_fn(
-        lambda x: torch.sum(x, dim=-1)
-    )
+    t_atoms_to_global = t_atoms_to_global.map_tensor_fn(lambda x: torch.sum(x, dim=-1))
 
     # [*, N, 14, 1]
     atom_mask = atom_mask[aatype, ...].unsqueeze(-1)

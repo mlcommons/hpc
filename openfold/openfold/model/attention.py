@@ -20,8 +20,8 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.helpers import slice_generator
+from openfold.model.linear import Linear
 
 
 class Attention(nn.Module):
@@ -39,6 +39,7 @@ class Attention(nn.Module):
             Supplementary '1.11.8 Reducing the memory consumption': Inference.
 
     """
+
     def __init__(
         self,
         c_q: int,
@@ -52,7 +53,6 @@ class Attention(nn.Module):
     ) -> None:
         super(Attention, self).__init__()
         assert c_k == c_v
-        # configuration:
         self.c_q = c_q
         self.c_k = c_k
         self.c_v = c_v
@@ -61,7 +61,6 @@ class Attention(nn.Module):
         self.gating = gating
         self.inf = inf
         self.chunk_size = chunk_size
-        # submodules:
         self.linear_q = Linear(c_q, c_hidden * num_heads, bias=False, init="glorot")
         self.linear_k = Linear(c_k, c_hidden * num_heads, bias=False, init="glorot")
         self.linear_v = Linear(c_v, c_hidden * num_heads, bias=False, init="glorot")
@@ -87,7 +86,7 @@ class Attention(nn.Module):
             bias: Optional logit bias tensor broadcastable to [*, num_heads, Q, K]
 
         Returns:
-            output:  [*, Q, c_q] tensor
+            output: [*, Q, c_q] tensor
 
         """
         query, key, value = self._prep_qkv(input_q, input_k, input_v)
@@ -109,14 +108,14 @@ class Attention(nn.Module):
 
     def _prep_qkv(
         self,
-        input_q: torch.Tensor,  # [*, Q, c_q]
-        input_k: torch.Tensor,  # [*, K, c_k]
-        input_v: torch.Tensor,  # [*, V, c_v]
-    ) -> Tuple[
-        torch.Tensor,  # query: [*, num_heads, Q, c_hidden]
-        torch.Tensor,  # key:   [*, num_heads, K, c_hidden]
-        torch.Tensor,  # value: [*, num_heads, V, c_hidden]
-    ]:
+        input_q: torch.Tensor,
+        input_k: torch.Tensor,
+        input_v: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # input_q: [*, Q, c_q]
+        # input_k: [*, K, c_k]
+        # input_v: [*, V, c_v]
+
         q = self.linear_q(input_q)
         k = self.linear_k(input_k)
         v = self.linear_v(input_v)
@@ -153,13 +152,15 @@ class Attention(nn.Module):
         if self.chunk_size is None:
             return _attention(query, key, value, mask, bias, self.inf)
         else:
-            return _attention_chunked(query, key, value, mask, bias, self.inf, self.chunk_size)
+            return _attention_chunked(
+                query, key, value, mask, bias, self.inf, self.chunk_size
+            )
 
     def _wrap_up(
         self,
-        output: torch.Tensor,   # [*, Q, num_heads, c_hidden]
-        input_q: torch.Tensor,  # [*, Q, c_q]
-    ) -> torch.Tensor:          # [*, Q, c_q]
+        output: torch.Tensor,
+        input_q: torch.Tensor,
+    ) -> torch.Tensor:
         if self.gating:
             gate = torch.sigmoid(self.linear_g(input_q))
             # gate: [*, Q, num_heads * c_hidden]
@@ -231,7 +232,11 @@ def _attention_chunked(
         key_chunk = key[:, left:right]
         value_chunk = value[:, left:right]
         mask_chunk = mask[:, left:right] if mask.size(1) == subbatch_size else mask
-        bias_chunk = bias[:, left:right] if bias is not None and bias.size(1) == subbatch_size else bias
+        bias_chunk = (
+            bias[:, left:right]
+            if bias is not None and bias.size(1) == subbatch_size
+            else bias
+        )
         output_chunk = _attention(
             query=query_chunk,
             key=key_chunk,

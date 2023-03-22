@@ -20,8 +20,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from openfold.model.linear import Linear
 from openfold.helpers import slice_generator
+from openfold.model.linear import Linear
 
 
 class GlobalAttention(nn.Module):
@@ -36,6 +36,7 @@ class GlobalAttention(nn.Module):
         chunk_size: Optional chunk size for a batch-like dimension.
 
     """
+
     def __init__(
         self,
         c_e: int,
@@ -46,14 +47,12 @@ class GlobalAttention(nn.Module):
         chunk_size: Optional[int],
     ) -> None:
         super(GlobalAttention, self).__init__()
-        # configuration:
         self.c_e = c_e
         self.c_hidden = c_hidden
         self.num_heads = num_heads
         self.inf = inf
         self.eps = eps
         self.chunk_size = chunk_size
-        # submodules:
         self.linear_q = Linear(c_e, c_hidden * num_heads, bias=False, init="glorot")
         self.linear_k = Linear(c_e, c_hidden, bias=False, init="glorot")
         self.linear_v = Linear(c_e, c_hidden, bias=False, init="glorot")
@@ -62,9 +61,20 @@ class GlobalAttention(nn.Module):
 
     def forward(
         self,
-        m: torch.Tensor,     # [batch, N_res, N_extra_seq, c_e] transposed extra MSA representation
-        mask: torch.Tensor,  # [batch, N_res, N_extra_seq] transposed extra MSA mask
-    ) -> torch.Tensor:       # [batch, N_res, N_extra_seq, c_e] output
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Global Attention forward pass.
+
+        Args:
+            m: [batch, N_res, N_extra_seq, c_e] transposed extra MSA representation
+            mask: [batch, N_res, N_extra_seq] transposed extra MSA mask
+
+        Returns:
+            m_update: [batch, N_res, N_extra_seq, c_e]
+                transposed extra MSA representation update
+
+        """
         if self.chunk_size is None:
             return self._forward(m=m, mask=mask)
         else:
@@ -72,14 +82,14 @@ class GlobalAttention(nn.Module):
 
     def _forward(
         self,
-        m: torch.Tensor,     # [batch, N_res, N_extra_seq, c_e] transposed extra MSA representation
-        mask: torch.Tensor,  # [batch, N_res, N_extra_seq] transposed extra MSA mask
-    ) -> torch.Tensor:       # [batch, N_res, N_extra_seq, c_e] output
-        q = (
-            torch.sum(m * mask.unsqueeze(-1), dim=-2)
-            / torch.sum(mask, dim=-1).add(self.eps).unsqueeze(-1)
-        )
+        m: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> torch.Tensor:
+        q_num = torch.sum(m * mask.unsqueeze(-1), dim=-2)
+        q_den = torch.sum(mask, dim=-1).add(self.eps).unsqueeze(-1)
+        q = q_num / q_den
         # q: [batch, N_res, c_e]
+        del q_num, q_den
 
         q = self.linear_q(q)
         # q: [batch, N_res, num_heads * c_hidden]

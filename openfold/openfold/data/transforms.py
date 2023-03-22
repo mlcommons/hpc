@@ -24,9 +24,8 @@ import torch
 import torch.nn.functional as F
 
 import openfold.data.residue_constants as rc
-from openfold.rigid_utils import Rotation, Rigid
+from openfold.rigid_utils import Rigid, Rotation
 from openfold.torch_utils import TORCH_SEED_MODULUS
-
 
 MSA_FEATURE_NAMES = [
     "msa",
@@ -266,7 +265,7 @@ def block_delete_msa(protein, config, seed=None):
     combined = torch.cat((torch.range(1, num_seq)[None], del_indices[None]))
     uniques, counts = combined.unique(return_counts=True)
     difference = uniques[counts == 1]
-    intersection = uniques[counts > 1]
+    # intersection = uniques[counts > 1]
     keep_indices = torch.squeeze(difference, 0)
 
     for k in MSA_FEATURE_NAMES:
@@ -299,8 +298,14 @@ def nearest_neighbor_clusters(protein, gap_agreement_weight=0.0):
     # Compute tf.einsum('mrc,nrc,c->mn', sample_one_hot, extra_one_hot, weights)
     # in an optimized fashion to avoid possible memory or computation blowup.
     agreement = torch.matmul(
-        torch.reshape(extra_one_hot, [extra_num_seq, num_res * 23]),
-        torch.reshape(sample_one_hot * weights, [num_seq, num_res * 23]).transpose(0, 1),
+        torch.reshape(
+            input=extra_one_hot,
+            shape=[extra_num_seq, num_res * 23],
+        ),
+        torch.reshape(
+            input=sample_one_hot * weights,
+            shape=[num_seq, num_res * 23],
+        ).transpose(0, 1),
     )
 
     # Assign each sequence in the extra sequences to the closest MSA sample
@@ -323,7 +328,9 @@ def unsorted_segment_sum(data, segment_ids, num_segments):
     segment_ids = segment_ids.view(segment_ids.shape[0], *((1,) * len(data.shape[1:])))
     segment_ids = segment_ids.expand(data.shape)
     shape = [num_segments] + list(data.shape[1:])
-    tensor = torch.zeros(*shape, device=segment_ids.device).scatter_add_(0, segment_ids, data.float())
+    tensor = torch.zeros(*shape, device=segment_ids.device).scatter_add_(
+        0, segment_ids, data.float()
+    )
     tensor = tensor.type(data.dtype)
     return tensor
 
@@ -363,10 +370,7 @@ def pseudo_beta_fn(
     aatype: torch.Tensor,
     all_atom_positions: torch.Tensor,
     all_atom_mask: Optional[torch.Tensor],
-) -> Union[
-    Tuple[torch.Tensor, torch.Tensor],
-    torch.Tensor,
-]:
+) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
     """Create pseudo beta features."""
     is_gly = torch.eq(aatype, rc.RESTYPE_ORDER["G"])
     ca_idx = rc.ATOM_ORDER["CA"]
@@ -435,7 +439,9 @@ def make_hhblits_profile(protein):
 
 
 @curry1
-def make_masked_msa(protein, profile_prob, same_prob, uniform_prob, replace_fraction, seed=None):
+def make_masked_msa(
+    protein, profile_prob, same_prob, uniform_prob, replace_fraction, seed=None
+):
     """Create data for BERT on raw MSA."""
     # Add a random amino acid uniformly.
     g = torch.Generator(device=protein["seq_length"].device)
@@ -462,9 +468,7 @@ def make_masked_msa(protein, profile_prob, same_prob, uniform_prob, replace_frac
     mask_prob = 1.0 - profile_prob - same_prob - uniform_prob
     assert mask_prob >= 0.0
 
-    categorical_probs = F.pad(
-        categorical_probs, pad_shapes, value=mask_prob
-    )
+    categorical_probs = F.pad(categorical_probs, pad_shapes, value=mask_prob)
 
     sh = protein["msa"].shape
     mask_position = torch.rand(sh, generator=g) < replace_fraction
@@ -508,11 +512,13 @@ def pad_to_schema_shape(
 
         pad_shape = [
             pad_size_map.get(dim_schema, dim_size)
-            for (dim_schema, dim_size)
-            in zip(schema_shape, tensor_shape)
+            for (dim_schema, dim_size) in zip(schema_shape, tensor_shape)
         ]
 
-        padding = [(0, pad_size - dim_size) for pad_size, dim_size in zip(pad_shape, tensor_shape)]
+        padding = [
+            (0, pad_size - dim_size)
+            for pad_size, dim_size in zip(pad_shape, tensor_shape)
+        ]
 
         padding.reverse()
         padding = list(itertools.chain(*padding))
@@ -547,7 +553,9 @@ def make_msa_feat(protein):
     ]
 
     if "cluster_profile" in protein:
-        deletion_mean_value = torch.atan(protein["cluster_deletion_mean"] / 3.0) * (2.0 / np.pi)
+        deletion_mean_value = torch.atan(protein["cluster_deletion_mean"] / 3.0) * (
+            2.0 / np.pi
+        )
         msa_feat.extend(
             [
                 protein["cluster_profile"],
@@ -574,9 +582,7 @@ def filter_features(
     allowed_feature_names: Set[str],
 ) -> Dict[str, torch.Tensor]:
     return {
-        key: tensor
-        for key, tensor in protein.items()
-        if key in allowed_feature_names
+        key: tensor for key, tensor in protein.items() if key in allowed_feature_names
     }
 
 
@@ -1083,9 +1089,10 @@ def get_backbone_frames(protein):
 
 def get_chi_angles(protein):
     dtype = protein["all_atom_mask"].dtype
-    protein["chi_angles_sin_cos"] = (protein["torsion_angles_sin_cos"][..., 3:, :]).to(dtype)
+    protein["chi_angles_sin_cos"] = protein["torsion_angles_sin_cos"][..., 3:, :].to(
+        dtype
+    )
     protein["chi_mask"] = protein["torsion_angles_mask"][..., 3:].to(dtype)
-
     return protein
 
 
@@ -1181,9 +1188,7 @@ def _batched_gather(data, inds, dim=0, no_batch_dims=0):
         r = r.view(*(*((1,) * i), -1, *((1,) * (len(inds.shape) - i - 1))))
         ranges.append(r)
 
-    remaining_dims = [
-        slice(None) for _ in range(len(data.shape) - no_batch_dims)
-    ]
+    remaining_dims = [slice(None) for _ in range(len(data.shape) - no_batch_dims)]
     remaining_dims[dim - no_batch_dims if dim >= 0 else dim] = inds
     ranges.extend(remaining_dims)
     return data[ranges]
