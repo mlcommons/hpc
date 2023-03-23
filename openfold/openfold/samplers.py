@@ -133,5 +133,4 @@ class ValidationSampler(Sampler[Tuple[int, int]]):
         yield from zip(indices, seeds)
 
     def __len__(self) -> int:
-j
         return self._epoch_length
