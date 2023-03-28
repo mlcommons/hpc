@@ -108,4 +108,4 @@ When launching distributed training use also `--distributed` flag.
 
 For single node training replace `python train.py` with `torchrun --standalone --nnodes=1 --nproc_per_node=8 train.py`.
 
-For multi-node training use full syntax: `torchrun --nnodes=16 --nproc_per_node=8 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT train.py` that is executed once per each node.
+For multi-node training use full syntax: `torchrun --nnodes=16 --nproc_per_node=8 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT train.py` that is executed once per each node. See the [scripts/multi_node_training.sub](scripts/multi_node_training.sub) example.
