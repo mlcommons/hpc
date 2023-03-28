@@ -23,13 +23,13 @@ def load_alignments_super_index(
     pprefix: str = "",
 ) -> Dict[str, dict]:
     if verbose:
-        print(f"{pprefix}Loading {repr(str(alignments_super_index_filepath))}...")
+        print(f"{pprefix}Loading {repr(alignments_super_index_filepath)}...")
     with open(alignments_super_index_filepath) as f:
         alignments_super_index = json.load(f)
     if verbose:
         print(
             f"{pprefix}alignments_super_index ({len(alignments_super_index)})"
-            f" loaded from {repr(str(alignments_super_index_filepath))} successfully!"
+            f" loaded from {repr(alignments_super_index_filepath)} successfully!"
         )
     return alignments_super_index
 

@@ -97,7 +97,6 @@ class TemplateHitFeaturizer:
         query_pdb_id: Optional[str] = None,
         shuffling_seed: Optional[int] = None,
     ) -> dict:
-
         if len(template_hits) == 0:
             return _create_empty_template_feats(len(query_sequence))
 

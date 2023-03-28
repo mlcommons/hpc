@@ -44,7 +44,7 @@ bash -c 'echo "srun SLURM_JOB_ID=$SLURM_JOB_ID SLURMD_NODENAME=$SLURMD_NODENAME"
 # Print current datetime again.
 echo "READY" $(date +"%Y-%m-%d %H:%M:%S")
 
-# Set `OMP_NUM_THREADS` for distributed PyTorch:
+# Set number of threads to use for parallel regions:
 export OMP_NUM_THREADS=1
 
 # Run the command:

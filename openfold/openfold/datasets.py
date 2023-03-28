@@ -483,7 +483,7 @@ def _assert_pdb_alignments(
         raise RuntimeError(
             f"`mmcif_chains_df` has {len(diff)} ids"
             " not present in `alignments_super_index`."
-            f" To filter them out, set `filter_by_alignments` flag."
+            " To filter them out, set `filter_by_alignments` flag."
         )
 
 

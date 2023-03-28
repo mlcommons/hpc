@@ -1149,7 +1149,6 @@ def random_crop_and_template_subsampling(
     num_res_crop_start = _randint(0, seq_length - num_res_crop_size)
 
     for key, tensor in protein.items():
-
         assert key in feature_schema_shapes
         schema_shape = feature_schema_shapes[key]
         assert isinstance(schema_shape, tuple)

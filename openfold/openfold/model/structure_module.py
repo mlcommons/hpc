@@ -297,7 +297,6 @@ def _torsion_angles_to_frames(
     aatype: torch.Tensor,
     rrgdf: torch.Tensor,
 ) -> Rigid:
-
     # [*, N, 8, 4, 4]
     default_4x4 = rrgdf[aatype, ...]
 
@@ -364,7 +363,6 @@ def _frames_and_literature_positions_to_atom14_pos(
     atom_mask: torch.Tensor,
     lit_positions: torch.Tensor,
 ) -> torch.Tensor:
-
     # [*, N, 14, 4, 4]
     # default_4x4 = default_frames[aatype, ...]
 

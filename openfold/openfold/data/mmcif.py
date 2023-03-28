@@ -99,7 +99,7 @@ def load_mmcif_chains_df(
 ) -> pd.DataFrame:
     """Load mmcif chains CSV file created by `scripts/preprocess_pdb_mmcif.py`."""
     if verbose:
-        print(f"{pprefix}Loading {repr(str(mmcif_chains_filepath))}...")
+        print(f"{pprefix}Loading {repr(mmcif_chains_filepath)}...")
     mmcif_chains_df = pd.read_csv(
         mmcif_chains_filepath,
         na_values="",
@@ -108,7 +108,7 @@ def load_mmcif_chains_df(
     if verbose:
         print(
             f"{pprefix}mmcif_chains_df {mmcif_chains_df.shape}"
-            f" loaded from {repr(str(mmcif_chains_filepath))} successfully!"
+            f" loaded from {repr(mmcif_chains_filepath)} successfully!"
         )
     return mmcif_chains_df
 
@@ -413,7 +413,6 @@ def _get_residue_keys(
         hetatm_atom = atom_site["hetatm_atom"]
 
         if mmcif_chain_id in legal_polymers:
-
             hetflag = " "
             if hetatm_atom == "HETATM":
                 # Water atoms are assigned a special hetflag of 'W' in Biopython.
