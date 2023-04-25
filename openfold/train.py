@@ -132,19 +132,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log_every_iters",
         type=int,
-        default=10,
-        help="Save logs every given iteration.",
+        default=-1,
+        help="""Save logs every given iteration.
+        A non-positive value disables the log saving.""",
     )
     parser.add_argument(
         "--checkpoint_every_iters",
         type=int,
-        default=50,
-        help="Save checkpoints every given iteration.",
+        default=0,
+        help="""Save checkpoints every given iteration.
+        A non-positive value disables the checkpoint saving.""",
     )
     parser.add_argument(
         "--keep_last_checkpoints",
         type=int,
-        default=1,
+        default=0,
         help="How many last checkpoints to keep.",
     )
     parser.add_argument(
@@ -156,7 +158,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--keep_best_checkpoints",
         type=int,
-        default=5,
+        default=0,
         help="How many best checkpoints to keep.",
     )
     parser.add_argument(
@@ -210,7 +212,9 @@ def parse_args() -> argparse.Namespace:
         "--gradient_accumulation_iters",
         type=int,
         default=1,
-        help="Gradient accumulation iters.",
+        help="""Gradient accumulation iters.
+        The default value of 1 means no accumulation.
+        When set to > 1, other _iters and _length args must be scaled accordingly.""",
     )
     parser.add_argument(
         "--num_train_dataloader_workers",
@@ -254,11 +258,15 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     # saving checkpoints must coincide with validation:
-    assert args.val_every_iters % args.checkpoint_every_iters == 0
+    if args.checkpoint_every_iters > 0:
+        assert args.val_every_iters % args.checkpoint_every_iters == 0
     # saving logs must coincide with validation and checkpoints:
-    assert args.val_every_iters % args.log_every_iters == 0
-    assert args.checkpoint_every_iters % args.log_every_iters == 0
+    if args.log_every_iters > 0:
+        assert args.val_every_iters % args.log_every_iters == 0
+        if args.checkpoint_every_iters > 0:
+            assert args.checkpoint_every_iters % args.log_every_iters == 0
     # everything must be divisble by gradient accumulation length:
+    assert args.gradient_accumulation_iters >= 1
     assert args.num_train_iters % args.gradient_accumulation_iters == 0
     assert args.val_every_iters % args.gradient_accumulation_iters == 0
     assert args.checkpoint_every_iters % args.gradient_accumulation_iters == 0
@@ -361,15 +369,14 @@ def training(args: argparse.Namespace) -> None:
     if torch.distributed.is_initialized():
         # Assuming distributed training:
         assert args.distributed is True
+        # https://pytorch.org/docs/stable/elastic/run.html#environment-variables
         rank = int(os.environ["RANK"])
-        group_rank = int(os.environ["GROUP_RANK"])
-        local_rank = int(os.environ["LOCAL_RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
+        local_rank = int(os.environ["LOCAL_RANK"])
         main_rank = 0
         is_main_process = bool(rank == main_rank)
-        process_name = f"dist_process_rank{rank}_group{group_rank}_local{local_rank}"
+        process_name = f"dist_process_rank{rank}"
         device = torch.device(f"cuda:{local_rank}")
-        torch.cuda.set_device(device=device)
         global_batch_size = args.device_batch_size * world_size
         if is_main_process:
             print(f"initialized distributed training: WORLD_SIZE={world_size}")
@@ -378,14 +385,16 @@ def training(args: argparse.Namespace) -> None:
         print("single GPU training")
         assert args.distributed is False
         rank = None
-        group_rank = None
-        local_rank = None
         world_size = None
+        local_rank = None
         main_rank = None
         is_main_process = True
         process_name = "single_process"
-        device = torch.device("cuda")
+        device = torch.device("cuda:0")
         global_batch_size = args.device_batch_size
+
+    # Set device:
+    torch.cuda.set_device(device=device)
 
     # Numerical precision settings:
     if args.precision == "fp32":
@@ -473,6 +482,7 @@ def training(args: argparse.Namespace) -> None:
     )
     assert num_prev_iters % args.gradient_accumulation_iters == 0
 
+    # Distributed wrapper:
     if args.distributed:
         alphafold = torch.nn.parallel.DistributedDataParallel(module=alphafold)
 
@@ -526,6 +536,8 @@ def training(args: argparse.Namespace) -> None:
     train_logs_outpath = logs_dirpath / "training.log"
     process_logs_outpath = logs_dirpath / (process_name + ".log")
     val_logs_outpath = logs_dirpath / "validation.log"
+    is_logging_enabled = bool(args.log_every_iters > 0)
+    is_main_process_and_logging = bool(is_main_process and is_logging_enabled)
 
     # Set first iteration:
     first_iteration = num_prev_iters + 1
@@ -538,7 +550,7 @@ def training(args: argparse.Namespace) -> None:
         init_lr_length=args.init_lr_length,
         optimizer=optimizer,
         iteration=first_iteration,
-        verbose=is_main_process,
+        verbose=False,
     )
 
     # Training seed:
@@ -589,38 +601,39 @@ def training(args: argparse.Namespace) -> None:
                 swa_alphafold.update(alphafold)
 
         # Average losses from distributed training:
-        if args.distributed:
-            losses_avg = dist_reduce_losses_avg(
-                losses=losses,
-                is_main_process=is_main_process,
-                main_rank=main_rank,
-                device=device,
-                synchronize=False,
-            )
-        else:
-            losses_avg = losses
-
-        # Convert from Dict[str, torch.Tensor] to Dict[str, float]:
-        losses = map_dict_values(fn=lambda t: t.item(), d=losses)
-        if is_main_process:
-            losses_avg = map_dict_values(fn=lambda t: t.item(), d=losses_avg)
+        if is_logging_enabled:
+            if args.distributed:
+                losses_avg = dist_reduce_losses_avg(
+                    losses=losses,
+                    is_main_process=is_main_process,
+                    main_rank=main_rank,
+                    device=device,
+                    synchronize=False,
+                )
+            else:
+                losses_avg = losses
+            # Convert losses from Dict[str, torch.Tensor] to Dict[str, float]:
+            losses = map_dict_values(fn=lambda t: t.item(), d=losses)
+            if is_main_process:
+                losses_avg = map_dict_values(fn=lambda t: t.item(), d=losses_avg)
 
         # Finalize training iteration perf measurement:
         perf_training += time.perf_counter()
 
         # Update process logs:
-        process_log = {
-            "iteration": iteration,
-            "sample_ids": list(map(list, train_batch["id"])),
-            "num_recycling_iters": num_recycling_iters,
-            "timestamp": get_timestamp_string(),
-            **{f"losses.{k}": v for k, v in losses.items()},
-            "duration": perf_training,
-        }
-        process_logs.append(process_log)
+        if is_logging_enabled and args.save_process_logs:
+            process_log = {
+                "iteration": iteration,
+                "sample_ids": list(map(list, train_batch["id"])),
+                "num_recycling_iters": num_recycling_iters,
+                "timestamp": get_timestamp_string(),
+                **{f"losses.{k}": v for k, v in losses.items()},
+                "duration": perf_training,
+            }
+            process_logs.append(process_log)
 
         # Update train logs:
-        if is_main_process:
+        if is_main_process_and_logging:
             train_log = {
                 "iteration": iteration,
                 "global_batch_size": global_batch_size,
@@ -632,8 +645,8 @@ def training(args: argparse.Namespace) -> None:
             train_logs.append(train_log)
             print(f"training {train_log}")
 
-        # Save logs:
-        if iteration % args.log_every_iters == 0:
+        # Save process and train logs:
+        if is_logging_enabled and iteration % args.log_every_iters == 0:
             if args.save_process_logs:
                 save_logs(process_logs, process_logs_outpath, append=True)
             process_logs.clear()
@@ -645,15 +658,17 @@ def training(args: argparse.Namespace) -> None:
         is_validation = bool(iteration % args.val_every_iters == 0)
         if is_validation:
             perf_validation = -time.perf_counter()
-            if is_main_process:
+            if is_main_process_and_logging:
                 print("validation...")
             del train_batch, train_outputs, loss
+            # Execute validation (evaluation) loop:
             val_metrics_list = validation(
                 alphafold=swa_alphafold if swa_alphafold.enabled else alphafold,
                 validation_dataloader=validation_dataloader,
                 device=device,
             )
             if args.distributed:
+                # Collect per-sample validation metrics to main process:
                 val_metrics_list = dist_gather_val_metrics(
                     val_metrics_list=val_metrics_list,
                     val_pdb_chain_ids=validation_dataset.pdb_chain_ids,
@@ -665,10 +680,14 @@ def training(args: argparse.Namespace) -> None:
                 )
             perf_validation += time.perf_counter()
             if is_main_process:
+                # Compute aggregated validation metrics in main process:
                 val_metrics_df = pd.DataFrame(val_metrics_list)
                 val_avg_lddt_ca = float(val_metrics_df["lddt_ca"].mean())
                 val_size = len(val_metrics_list)
+                assert val_size == len(validation_dataset)
                 val_throughput = val_size / perf_validation
+            if is_main_process_and_logging:
+                # Save validation logs:
                 val_log = {
                     "iteration": iteration,
                     "avg_lddt_ca": val_avg_lddt_ca,
@@ -680,11 +699,16 @@ def training(args: argparse.Namespace) -> None:
                 print(f"validation {val_log}")
                 val_log["metrics_list"] = val_metrics_list
                 save_logs([val_log], val_logs_outpath, append=True)
+            # Preventively clear the cache created during validation:
             gc.collect()
             torch.cuda.empty_cache()
 
         # Save checkpoint:
-        if is_main_process and iteration % args.checkpoint_every_iters == 0:
+        if (
+            is_main_process
+            and args.checkpoint_every_iters > 0
+            and iteration % args.checkpoint_every_iters == 0
+        ):
             save_checkpoint_from_training(
                 alphafold=alphafold,
                 optimizer=optimizer,
