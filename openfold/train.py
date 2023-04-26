@@ -413,34 +413,6 @@ def training(args: argparse.Namespace) -> None:
         precision=args.precision,
     )
 
-    # Create training dataset:
-    initial_training_dataset = InitialTrainingDataset(
-        pdb_mmcif_chains_filepath=args.pdb_mmcif_chains_filepath,
-        pdb_mmcif_dicts_dirpath=args.pdb_mmcif_dicts_dirpath,
-        pdb_obsolete_filepath=args.pdb_obsolete_filepath,
-        pdb_alignments_dirpath=args.pdb_alignments_dirpath,
-        max_pdb_release_date=args.train_max_pdb_release_date,
-        alphafold_config=alphafold_config,
-        filter_by_alignments=args.filter_by_alignments,
-        use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
-        name=f"initial_training_dataset_{process_name}",
-    )
-
-    # Create validation dataset:
-    validation_dataset = ValidationDataset(
-        pdb_mmcif_chains_filepath=args.pdb_mmcif_chains_filepath,
-        pdb_mmcif_dicts_dirpath=args.pdb_mmcif_dicts_dirpath,
-        pdb_obsolete_filepath=args.pdb_obsolete_filepath,
-        pdb_alignments_dirpath=args.pdb_alignments_dirpath,
-        min_cameo_submission_date=args.val_min_cameo_submission_date,
-        max_cameo_submission_date=args.val_max_cameo_submission_date,
-        max_sequence_length=args.val_max_sequence_length,
-        alphafold_config=alphafold_config,
-        filter_by_alignments=args.filter_by_alignments,
-        use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
-        name=f"validation_dataset_{process_name}",
-    )
-
     # Create alphafold module:
     alphafold = create_alphafold_module(
         alphafold_config=alphafold_config,
@@ -487,9 +459,63 @@ def training(args: argparse.Namespace) -> None:
     )
     assert num_prev_iters % args.gradient_accumulation_iters == 0
 
+    # Set first iteration:
+    first_iteration = num_prev_iters + 1
+
+    # Create learning rate scheduler:
+    lr_scheduler = AlphaFoldLRScheduler(
+        init_lr=args.init_lr,
+        final_lr=args.final_lr,
+        warmup_lr_length=args.warmup_lr_length,
+        init_lr_length=args.init_lr_length,
+        optimizer=optimizer,
+        iteration=first_iteration,
+        verbose=False,
+    )
+
     # Distributed wrapper:
     if args.distributed:
         alphafold = torch.nn.parallel.DistributedDataParallel(module=alphafold)
+
+    # Create logging-related objects:
+    train_logs = []
+    process_logs = []
+    logs_dirpath = args.training_dirpath / "logs"
+    train_logs_outpath = logs_dirpath / "training.log"
+    process_logs_outpath = logs_dirpath / (process_name + ".log")
+    val_logs_outpath = logs_dirpath / "validation.log"
+    is_logging_enabled = bool(args.log_every_iters > 0)
+    is_main_process_and_logging = bool(is_main_process and is_logging_enabled)
+
+    # <data staging code here>
+
+    # Create training dataset:
+    initial_training_dataset = InitialTrainingDataset(
+        pdb_mmcif_chains_filepath=args.pdb_mmcif_chains_filepath,
+        pdb_mmcif_dicts_dirpath=args.pdb_mmcif_dicts_dirpath,
+        pdb_obsolete_filepath=args.pdb_obsolete_filepath,
+        pdb_alignments_dirpath=args.pdb_alignments_dirpath,
+        max_pdb_release_date=args.train_max_pdb_release_date,
+        alphafold_config=alphafold_config,
+        filter_by_alignments=args.filter_by_alignments,
+        use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
+        name=f"initial_training_dataset_{process_name}",
+    )
+
+    # Create validation dataset:
+    validation_dataset = ValidationDataset(
+        pdb_mmcif_chains_filepath=args.pdb_mmcif_chains_filepath,
+        pdb_mmcif_dicts_dirpath=args.pdb_mmcif_dicts_dirpath,
+        pdb_obsolete_filepath=args.pdb_obsolete_filepath,
+        pdb_alignments_dirpath=args.pdb_alignments_dirpath,
+        min_cameo_submission_date=args.val_min_cameo_submission_date,
+        max_cameo_submission_date=args.val_max_cameo_submission_date,
+        max_sequence_length=args.val_max_sequence_length,
+        alphafold_config=alphafold_config,
+        filter_by_alignments=args.filter_by_alignments,
+        use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
+        name=f"validation_dataset_{process_name}",
+    )
 
     # Create training sampler:
     initial_training_sampler = InitialTrainingSampler(
@@ -532,30 +558,6 @@ def training(args: argparse.Namespace) -> None:
         dataset=validation_dataset,
         sampler=validation_sampler,
         num_workers=args.num_val_dataloader_workers,
-    )
-
-    # Create logging-related objects:
-    train_logs = []
-    process_logs = []
-    logs_dirpath = args.training_dirpath / "logs"
-    train_logs_outpath = logs_dirpath / "training.log"
-    process_logs_outpath = logs_dirpath / (process_name + ".log")
-    val_logs_outpath = logs_dirpath / "validation.log"
-    is_logging_enabled = bool(args.log_every_iters > 0)
-    is_main_process_and_logging = bool(is_main_process and is_logging_enabled)
-
-    # Set first iteration:
-    first_iteration = num_prev_iters + 1
-
-    # Create learning rate scheduler:
-    lr_scheduler = AlphaFoldLRScheduler(
-        init_lr=args.init_lr,
-        final_lr=args.final_lr,
-        warmup_lr_length=args.warmup_lr_length,
-        init_lr_length=args.init_lr_length,
-        optimizer=optimizer,
-        iteration=first_iteration,
-        verbose=False,
     )
 
     # Training seed:
