@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import datetime
+import math
 from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -379,7 +380,7 @@ def _get_weight(sample: dict) -> float:
 
     cluster_probability = 1.0
     if pdb_cluster_size > 0:
-        cluster_probability = 1 / pdb_cluster_size
+        cluster_probability = 1 / math.sqrt(pdb_cluster_size)
 
     weight = length_probability * cluster_probability
     return weight
