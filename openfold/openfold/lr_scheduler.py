@@ -36,49 +36,38 @@ class AlphaFoldLRScheduler:
         warmup_lr_length: int,
         init_lr_length: int,
         optimizer: torch.optim.Optimizer,
-        iteration: int,
         verbose: bool = False,
     ) -> None:
         self.init_lr = init_lr
         self.final_lr = final_lr
-        assert warmup_lr_length >= 0
         self.warmup_lr_length = warmup_lr_length
         self.init_lr_length = init_lr_length
         self.optimizer = optimizer
-        assert iteration > 0
-        self.iteration = iteration
         self.verbose = verbose
-        self.warmup_linspace = torch.linspace(
+        # create LR values for the warm-up:
+        assert warmup_lr_length >= 0
+        self._warmup_linspace = torch.linspace(
             start=init_lr / max(warmup_lr_length, 1),
             end=init_lr,
             steps=warmup_lr_length,
             dtype=torch.float64,
         )
-        self.lr_value = None
         self._prev_lr_value = None
-        self._set_lr_value()
-        set_learning_rate(
-            optimizer=self.optimizer,
-            lr_value=self.lr_value,
-            verbose=self.verbose,
-        )
 
-    def step(self) -> None:
-        self.iteration += 1
-        self._prev_lr_value = self.lr_value
-        self._set_lr_value()
-        if self.lr_value != self._prev_lr_value:
+    def __call__(self, iteration: int) -> None:
+        # Determine lr_value for given iteration:
+        if iteration <= self.warmup_lr_length:
+            lr_value = self._warmup_linspace[iteration - 1].item()
+            lr_value = round(lr_value, 10)
+        elif iteration <= self.init_lr_length:
+            lr_value = self.init_lr
+        else:
+            lr_value = self.final_lr
+        # Set only if differs from the previous call:
+        if lr_value != self._prev_lr_value:
             set_learning_rate(
                 optimizer=self.optimizer,
-                lr_value=self.lr_value,
+                lr_value=lr_value,
                 verbose=self.verbose,
             )
-
-    def _set_lr_value(self) -> None:
-        if self.iteration <= self.warmup_lr_length:
-            self.lr_value = self.warmup_linspace[self.iteration - 1].item()
-            self.lr_value = round(self.lr_value, 10)
-        elif self.iteration <= self.init_lr_length:
-            self.lr_value = self.init_lr
-        else:
-            self.lr_value = self.final_lr
+            self._prev_lr_value = lr_value

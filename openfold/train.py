@@ -510,7 +510,6 @@ def training(args: argparse.Namespace) -> None:
         warmup_lr_length=args.warmup_lr_length,
         init_lr_length=args.init_lr_length,
         optimizer=optimizer,
-        iteration=first_iteration,
         verbose=False,
     )
 
@@ -676,6 +675,9 @@ def training(args: argparse.Namespace) -> None:
                     parameters=alphafold.parameters(),
                     max_norm=args.clip_grad_max_norm,
                 )
+
+            # LR scheduler update:
+            lr_scheduler(iteration)
 
             # Optimizer step (weights/parameters update):
             optimizer.step()
@@ -844,9 +846,6 @@ def training(args: argparse.Namespace) -> None:
         # Stop training if reached target validation metric:
         if is_validation and stop_training_flag:
             break
-
-        # LR scheduler update:
-        lr_scheduler.step()
 
     # Synchronize before return:
     if args.distributed:
