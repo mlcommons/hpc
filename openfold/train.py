@@ -22,6 +22,9 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 import torch
+from mlperf_common.frameworks.pyt import PyTCommunicationHandler
+from mlperf_common.logging import MLLoggerWrapper
+from mlperf_logging import mllog
 
 from openfold.checkpoint_utils import (
     resume_from_latest_checkpoint,
@@ -253,6 +256,12 @@ def parse_args() -> argparse.Namespace:
         help="Whether to save logs from each process.",
     )
     parser.add_argument(
+        "--mlperf_benchmark_type",
+        choices=["TimeToTrain", "Throughput"],
+        default="TimeToTrain",
+        help="MLPerf benchmark type.",
+    )
+    parser.add_argument(
         "--distributed",
         action="store_true",
         help="Whether to enable distributed training.",
@@ -373,7 +382,10 @@ def training(args: argparse.Namespace) -> None:
         # https://pytorch.org/docs/stable/elastic/run.html#environment-variables
         rank = int(os.environ["RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
+        local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
         local_rank = int(os.environ["LOCAL_RANK"])
+        assert world_size % local_world_size == 0
+        num_nodes = world_size // local_world_size
         main_rank = 0
         is_main_process = bool(rank == main_rank)
         process_name = f"dist_process_rank{rank}"
@@ -387,12 +399,41 @@ def training(args: argparse.Namespace) -> None:
         assert args.distributed is False
         rank = None
         world_size = None
+        local_world_size = None
         local_rank = None
+        num_nodes = None
         main_rank = None
         is_main_process = True
         process_name = "single_process"
         device = torch.device("cuda:0")
         global_batch_size = args.device_batch_size
+
+    if is_main_process:
+        args.training_dirpath.mkdir(parents=True, exist_ok=True)
+
+    # MLPerf logging setup:
+    mllog_datestamp = os.environ.get("DATESTAMP", "yymmddHHMMSSfffffffff")
+    mlperf_instance = "0"  # TODO: set this value correctly for the "Throughput" benchmark
+    if args.mlperf_benchmark_type == "TimeToTrain":
+        mllog_suffix = os.environ.get("EXP_ID", "0")
+    elif args.mlperf_benchmark_type == "Throughput":
+        mllog_suffix = mlperf_instance
+    else:
+        raise ValueError(f"unknown {repr(args.mlperf_benchmark_type)}")
+    mllog_filename = f"{mllog_datestamp}_{mllog_suffix}.log"
+    mllog_filepath = args.training_dirpath / mllog_filename
+    mllog.config(filename=str(mllog_filepath))
+    mllogger = MLLoggerWrapper(PyTCommunicationHandler(), value=None)
+    mllogger.start(key=mllog.constants.INIT_START, sync=True)
+    mllogger.event(key=mllog.constants.CACHE_CLEAR, value=True)
+    mllogger.mlperf_submission_log(benchmark="openfold", num_nodes=num_nodes)
+    mllogger.event(key=mllog.constants.SEED, value=args.seed)
+    mllogger.event(key="number_of_ranks", value=world_size)
+    mllogger.event(key="number_of_nodes", value=num_nodes)
+    mllogger.event(key="accelerators_per_node", value=local_world_size)
+    mllogger.event(key=mllogger.constants.GLOBAL_BATCH_SIZE, value=global_batch_size)
+    mllogger.event(key=mllogger.constants.OPT_BASE_LR, value=args.init_lr)
+    mllogger.event(key="precision", value=args.precision)
 
     # Set device:
     torch.cuda.set_device(device=device)
@@ -487,7 +528,28 @@ def training(args: argparse.Namespace) -> None:
     is_logging_enabled = bool(args.log_every_iters > 0)
     is_main_process_and_logging = bool(is_main_process and is_logging_enabled)
 
+    # Start MLPerf time-to-train (TTT) measurement:
+    mllogger.log_init_stop_run_start()
+
+    # Start data staging:
+    mllogger.event(key="staging_start")
+    staging_perf = -time.perf_counter()
+
     # <data staging code here>
+
+    # Finalize data staging:
+    staging_perf += time.perf_counter()
+    mllogger.event(
+        key="staging_stop",
+        sync=False,
+        metadata={"staging_duration": staging_perf, "instance": mlperf_instance},
+    )
+    mllogger.event(
+        key="tracked_stats",
+        sync=False,
+        value={"staging_duration": staging_perf},
+        metadata={"step": 0, "instance": mlperf_instance},
+    )
 
     # Create training dataset:
     initial_training_dataset = InitialTrainingDataset(
@@ -565,6 +627,21 @@ def training(args: argparse.Namespace) -> None:
 
     # Training loop:
     for iteration in range(first_iteration, args.num_train_iters + 1):
+        # Train-val cycle:
+        train_val_cycle_i = (iteration - 1) // args.val_every_iters + 1
+        is_train_val_cycle_start = bool((iteration - 1) % args.val_every_iters == 0)
+        is_train_val_cycle_end = bool(iteration % args.val_every_iters == 0)
+        train_val_cycle_size = global_batch_size * args.val_every_iters
+        epoch_num = train_val_cycle_i * train_val_cycle_size
+
+        # Start MLPerf training throughput measurement:
+        if is_train_val_cycle_start:
+            mllogger.start(
+                key=mllogger.constants.EPOCH_START,
+                sync=False,
+                metadata={"epoch_num": epoch_num, "instance": mlperf_instance},
+            )
+
         # Start training iteration perf measurement:
         perf_training = -time.perf_counter()
 
@@ -661,9 +738,23 @@ def training(args: argparse.Namespace) -> None:
                 save_logs(train_logs, train_logs_outpath, append=True)
                 train_logs.clear()
 
+        # End MLPerf training throughput measurement:
+        if is_train_val_cycle_end:
+            mllogger.end(
+                key=mllogger.constants.EPOCH_STOP,
+                sync=False,
+                metadata={"epoch_num": epoch_num, "instance": mlperf_instance},
+            )
+
         # Validation (evaluation):
-        is_validation = bool(iteration % args.val_every_iters == 0)
+        is_validation = is_train_val_cycle_end
         if is_validation:
+            # Start MLPerf evaluation measurement:
+            mllogger.start(
+                key=mllogger.constants.EVAL_START,
+                sync=False,
+                metadata={"epoch_num": epoch_num, "instance": mlperf_instance},
+            )
             perf_validation = -time.perf_counter()
             if is_main_process_and_logging:
                 print("validation...")
@@ -693,6 +784,11 @@ def training(args: argparse.Namespace) -> None:
                 val_size = len(val_metrics_list)
                 assert val_size == len(validation_dataset)
                 val_throughput = val_size / perf_validation
+                mllogger.event(
+                    key="eval_accuracy",
+                    value=val_avg_lddt_ca,
+                    metadata={"epoch_num": epoch_num, "instance": mlperf_instance},
+                )
             if is_main_process_and_logging:
                 # Save validation logs:
                 val_log = {
@@ -719,6 +815,12 @@ def training(args: argparse.Namespace) -> None:
             # Preventively clear the cache created during validation:
             gc.collect()
             torch.cuda.empty_cache()
+            # End MLPerf evaluation measurement:
+            mllogger.end(
+                key=mllogger.constants.EVAL_STOP,
+                sync=False,
+                metadata={"epoch_num": epoch_num, "instance": mlperf_instance},
+            )
 
         # Save checkpoint:
         if (
@@ -749,6 +851,9 @@ def training(args: argparse.Namespace) -> None:
     # Synchronize before return:
     if args.distributed:
         torch.distributed.barrier()
+
+    # Log the end of the training loop:
+    mllogger.log_run_stop(status=mllogger.constants.SUCCESS)
 
 
 if __name__ == "__main__":

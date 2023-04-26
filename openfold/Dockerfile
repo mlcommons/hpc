@@ -22,7 +22,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN pip install \
     biopython==1.79 \
     Pympler==1.0.1 \
-    dacite==1.8.0
+    dacite==1.8.0 \
+    "git+https://github.com/mlcommons/logging.git@2.1.0" \
+    "git+https://github.com/NVIDIA/mlperf-common.git"
 
 # Build and install Kalign from source:
 RUN wget -q -P /workspace/downloads https://github.com/TimoLassmann/kalign/archive/refs/tags/v3.3.5.tar.gz \

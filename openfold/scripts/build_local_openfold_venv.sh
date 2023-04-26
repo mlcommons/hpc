@@ -65,7 +65,9 @@ conda install -y \
     conda-forge::Pympler==1.0.1 \
     bioconda::kalign3==3.3.*
 
-pip install dacite==1.8.0
+pip install dacite==1.8.0 \
+    "git+https://github.com/mlcommons/logging.git@2.1.0" \
+    "git+https://github.com/NVIDIA/mlperf-common.git"
 
 # Install OpenFold source code package in editable mode:
 pip install -e .
