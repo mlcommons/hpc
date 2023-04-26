@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:22.11-py3
+ARG FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.04-py3
 
 FROM ${FROM_IMAGE_NAME}
 
@@ -22,7 +22,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN pip install \
     biopython==1.79 \
     Pympler==1.0.1 \
-    dacite==1.7.0
+    dacite==1.8.0
 
 # Build and install Kalign from source:
 RUN wget -q -P /workspace/downloads https://github.com/TimoLassmann/kalign/archive/refs/tags/v3.3.5.tar.gz \

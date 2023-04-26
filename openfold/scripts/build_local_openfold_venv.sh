@@ -55,17 +55,17 @@ source scripts/activate_local_openfold_venv.sh $PREFIX_PATH
 # Install requirements:
 echo "Installing requirements..."
 conda install -y \
-    pytorch::pytorch==1.13.* \
+    pytorch::pytorch==2.0.* \
     conda-forge::numpy==1.22.2 \
-    conda-forge::pandas==1.4.4 \
-    conda-forge::scipy==1.6.3 \
-    conda-forge::tqdm==4.64.1 \
+    conda-forge::pandas==1.5.2 \
+    conda-forge::scipy==1.10.1 \
+    conda-forge::tqdm==4.65.0 \
     conda-forge::psutil==5.9.4 \
     conda-forge::biopython==1.79 \
     conda-forge::Pympler==1.0.1 \
     bioconda::kalign3==3.3.*
 
-pip install dacite==1.7.0
+pip install dacite==1.8.0
 
 # Install OpenFold source code package in editable mode:
 pip install -e .
