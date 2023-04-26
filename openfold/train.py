@@ -105,6 +105,12 @@ def parse_args() -> argparse.Namespace:
         help="Max sequence length for filtering CAMEO validation set.",
     )
     parser.add_argument(
+        "--target_avg_lddt_ca_value",
+        type=float,
+        default=0.8,
+        help="Target avg lDDT-Ca value required to stop training.",
+    )
+    parser.add_argument(
         "--initialize_parameters_from",
         type=Path,
         default=None,
@@ -698,6 +704,16 @@ def training(args: argparse.Namespace) -> None:
                 print(f"validation {val_log}")
                 val_log["metrics_list"] = val_metrics_list
                 save_logs([val_log], val_logs_outpath, append=True)
+            # Check if validation reaches target accuracy:
+            if is_main_process:
+                if val_avg_lddt_ca >= args.target_avg_lddt_ca_value:
+                    stop_training_flag = torch.ones(1, device=device)
+                else:
+                    stop_training_flag = torch.zeros(1, device=device)
+            else:
+                stop_training_flag = torch.zeros(1, device=device)
+            if args.distributed:
+                torch.distributed.broadcast(tensor=stop_training_flag, src=main_rank)
             # Preventively clear the cache created during validation:
             gc.collect()
             torch.cuda.empty_cache()
@@ -720,6 +736,10 @@ def training(args: argparse.Namespace) -> None:
                 is_validation=is_validation,
                 val_avg_lddt_ca=val_avg_lddt_ca if is_validation else None,
             )
+
+        # Stop training if reached target validation metric:
+        if is_validation and stop_training_flag:
+            break
 
         # LR scheduler update:
         lr_scheduler.step()
