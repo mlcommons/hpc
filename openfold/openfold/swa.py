@@ -21,12 +21,12 @@ from openfold.model.alphafold import AlphaFold
 class AlphaFoldSWA(nn.Module):
     """AlphaFold SWA (Stochastic Weight Averaging) module wrapper."""
 
-    def __init__(self, alphafold: AlphaFold, enabled: bool) -> None:
+    def __init__(self, alphafold: AlphaFold, enabled: bool, decay_rate: float) -> None:
         super(AlphaFoldSWA, self).__init__()
         if enabled:
             self.averaged_model = torch.optim.swa_utils.AveragedModel(
                 model=alphafold,
-                avg_fn=swa_avg_fn,
+                avg_fn=swa_avg_fn(decay_rate=decay_rate),
             )
             self.enabled = True
         else:
@@ -43,21 +43,28 @@ class AlphaFoldSWA(nn.Module):
         return self.averaged_model(batch)
 
 
-def swa_avg_fn(
-    averaged_model_parameter: torch.Tensor,
-    model_parameter: torch.Tensor,
-    num_averaged: torch.Tensor,
-) -> torch.Tensor:
-    """Averaging function for EMA with decay 0.999
+class swa_avg_fn:
+    """Averaging function for EMA with configurable decay rate
     (Supplementary '1.11.7 Evaluator setup')."""
-    # return averaged_model_parameter * 0.999 + model_parameter * 0.001
-    # avg * 0.999 + m * 0.001
-    # 999*avg/1000 + m/1000
-    # (999*avg + avg - avg)/1000 + m/1000
-    # (1000*avg - avg)/1000 + m/1000
-    # 1000*avg/1000 - avg/1000 + m/1000
-    # avg + (m - avg)/1000
-    # avg + (m - avg)*0.001
-    return (
-        averaged_model_parameter + (model_parameter - averaged_model_parameter) * 0.001
-    )
+
+    def __init__(self, decay_rate: float) -> None:
+        self._decay_rate = decay_rate
+
+    def __call__(
+        self,
+        averaged_model_parameter: torch.Tensor,
+        model_parameter: torch.Tensor,
+        num_averaged: torch.Tensor,
+    ) -> torch.Tensor:
+        # for decay_rate = 0.999:
+        # return averaged_model_parameter * 0.999 + model_parameter * 0.001
+        # avg * 0.999 + m * 0.001
+        # 999*avg/1000 + m/1000
+        # (999*avg + avg - avg)/1000 + m/1000
+        # (1000*avg - avg)/1000 + m/1000
+        # 1000*avg/1000 - avg/1000 + m/1000
+        # avg + (m - avg)/1000
+        # avg + (m - avg)*0.001
+        return averaged_model_parameter + (
+            model_parameter - averaged_model_parameter
+        ) * (1.0 - self._decay_rate)

@@ -229,11 +229,6 @@ def parse_args() -> argparse.Namespace:
         help="Num workers (subprocesses) for each instance of validation dataloader.",
     )
     parser.add_argument(
-        "--swa",
-        action="store_true",
-        help="Whether to enable Stochastic Weight Averaging (SWA).",
-    )
-    parser.add_argument(
         "--filter_by_alignments",
         action="store_true",
         help="Whether to filter out mmcif chains with no alignments.",
@@ -469,7 +464,11 @@ def training(args: argparse.Namespace) -> None:
         )
 
     # Create optional SWA version of AlphaFold for evaluation and checkpoints:
-    swa_alphafold = AlphaFoldSWA(alphafold, enabled=args.swa)
+    swa_alphafold = AlphaFoldSWA(
+        alphafold=alphafold,
+        enabled=alphafold_config.swa_enabled,
+        decay_rate=alphafold_config.swa_decay_rate,
+    )
 
     # Resume from latest checkpoint if it exists:
     num_prev_iters = resume_from_latest_checkpoint(

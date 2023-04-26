@@ -338,6 +338,10 @@ class AlphaFoldConfig:
     use_clamped_fape_probability: float = 0.9
     self_distillation_plddt_threshold: float = 50.0
 
+    # Whether to enable Stochastic Weight Averaging (SWA):
+    swa_enabled: bool = True
+    swa_decay_rate: float = 0.999
+
     # Sequence crop & pad size (for "train" mode only):
     train_sequence_crop_size: int = 256  # N_res
 
