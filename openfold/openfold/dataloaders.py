@@ -43,7 +43,7 @@ class InitialTrainingDataloader(DataLoader):
             batch_size=device_batch_size,
             num_workers=num_workers,
             drop_last=True,
-            prefetch_factor=int(4 if num_workers > 0 else 2),
+            prefetch_factor=(4 if num_workers > 0 else None),
             persistent_workers=bool(num_workers > 0),
         )
         self._set_train_batch_properties_fn = TrainBatchProperties(
@@ -75,7 +75,7 @@ class ValidationDataloader(DataLoader):
             batch_size=1,
             num_workers=num_workers,
             drop_last=True,
-            prefetch_factor=int(4 if num_workers > 0 else 2),
+            prefetch_factor=(4 if num_workers > 0 else None),
             persistent_workers=bool(num_workers > 0),
         )
 
