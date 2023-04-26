@@ -413,7 +413,7 @@ def training(args: argparse.Namespace) -> None:
 
     # MLPerf logging setup:
     mllog_datestamp = os.environ.get("DATESTAMP", "yymmddHHMMSSfffffffff")
-    mlperf_instance = "0"  # TODO: set this value correctly for the "Throughput" benchmark
+    mlperf_instance = "0"  # TODO: set this value correctly for "Throughput" benchmark
     if args.mlperf_benchmark_type == "TimeToTrain":
         mllog_suffix = os.environ.get("EXP_ID", "0")
     elif args.mlperf_benchmark_type == "Throughput":
