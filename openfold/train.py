@@ -207,17 +207,6 @@ def parse_args() -> argparse.Namespace:
         the initial learning rate to its final value.""",
     )
     parser.add_argument(
-        "--gradient_clipping",
-        action="store_true",
-        help="Whether to enable gradient clipping.",
-    )
-    parser.add_argument(
-        "--clip_grad_max_norm",
-        type=float,
-        default=0.1,
-        help="Max norm value for gradient clipping.",
-    )
-    parser.add_argument(
         "--gradient_accumulation_iters",
         type=int,
         default=1,
@@ -670,10 +659,10 @@ def training(args: argparse.Namespace) -> None:
 
         if iteration % args.gradient_accumulation_iters == 0:
             # Gradient clipping:
-            if args.gradient_clipping:
+            if alphafold_config.gradient_clipping:
                 torch.nn.utils.clip_grad_norm_(
                     parameters=alphafold.parameters(),
-                    max_norm=args.clip_grad_max_norm,
+                    max_norm=alphafold_config.clip_grad_max_norm,
                 )
 
             # LR scheduler update:

@@ -338,6 +338,10 @@ class AlphaFoldConfig:
     use_clamped_fape_probability: float = 0.9
     self_distillation_plddt_threshold: float = 50.0
 
+    # Whether to enable gradient clipping by the max norm value:
+    gradient_clipping: bool = True
+    clip_grad_max_norm: float = 0.1
+
     # Whether to enable Stochastic Weight Averaging (SWA):
     swa_enabled: bool = True
     swa_decay_rate: float = 0.9
