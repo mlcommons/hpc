@@ -176,10 +176,10 @@ def parse_args() -> argparse.Namespace:
         help="Whether to keep all validation checkpoints.",
     )
     parser.add_argument(
-        "--device_batch_size",
+        "--local_batch_size",
         type=int,
         default=1,
-        help="Local batch size (per device).",
+        help="Local batch size.",
     )
     parser.add_argument(
         "--init_lr",
@@ -390,7 +390,7 @@ def training(args: argparse.Namespace) -> None:
         is_main_process = bool(rank == main_rank)
         process_name = f"dist_process_rank{rank}"
         device = torch.device(f"cuda:{local_rank}")
-        global_batch_size = args.device_batch_size * world_size
+        global_batch_size = args.local_batch_size * world_size
         if is_main_process:
             print(f"initialized distributed training: WORLD_SIZE={world_size}")
     else:
@@ -406,7 +406,7 @@ def training(args: argparse.Namespace) -> None:
         is_main_process = True
         process_name = "single_process"
         device = torch.device("cuda:0")
-        global_batch_size = args.device_batch_size
+        global_batch_size = args.local_batch_size
 
     if is_main_process:
         args.training_dirpath.mkdir(parents=True, exist_ok=True)
@@ -581,7 +581,7 @@ def training(args: argparse.Namespace) -> None:
     # Create training sampler:
     initial_training_sampler = InitialTrainingSampler(
         dataset=initial_training_dataset,
-        device_batch_size=args.device_batch_size,
+        local_batch_size=args.local_batch_size,
         global_batch_size=global_batch_size,
         num_train_iters=args.num_train_iters,
         seed=get_seed_from_string(f"initial_training_sampler_{args.seed}"),
@@ -603,7 +603,7 @@ def training(args: argparse.Namespace) -> None:
     initial_training_dataloader = InitialTrainingDataloader(
         dataset=initial_training_dataset,
         sampler=initial_training_sampler,
-        device_batch_size=args.device_batch_size,
+        local_batch_size=args.local_batch_size,
         num_workers=args.num_train_dataloader_workers,
         seed=get_seed_from_string(f"initial_training_dataloader_{args.seed}"),
         uniform_recycling_iters=list(

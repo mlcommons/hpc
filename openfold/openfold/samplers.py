@@ -28,7 +28,7 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
     def __init__(
         self,
         dataset: InitialTrainingDataset,
-        device_batch_size: int,
+        local_batch_size: int,
         global_batch_size: int,
         num_train_iters: int,
         seed: int,
@@ -43,7 +43,7 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
             assert world_size is not None
             assert global_batch_size % world_size == 0
         weights = dataset.get_sampler_weights()
-        num_samples_in_device_epoch = num_train_iters * device_batch_size
+        num_samples_in_device_epoch = num_train_iters * local_batch_size
         num_samples_in_global_epoch = num_train_iters * global_batch_size
         # Sample indices:
         index_generator = torch.Generator()
@@ -73,7 +73,7 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
             index_seed_pairs = index_seed_pairs[rank::world_size]
         assert len(index_seed_pairs) == num_samples_in_device_epoch
         # Move forward by skipping previous iterations:
-        offset = num_prev_iters * device_batch_size
+        offset = num_prev_iters * local_batch_size
         assert offset <= len(index_seed_pairs)
         self.index_seed_pairs = index_seed_pairs[offset:]
 
