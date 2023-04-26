@@ -340,7 +340,7 @@ class AlphaFoldConfig:
 
     # Whether to enable Stochastic Weight Averaging (SWA):
     swa_enabled: bool = True
-    swa_decay_rate: float = 0.999
+    swa_decay_rate: float = 0.9
 
     # Sequence crop & pad size (for "train" mode only):
     train_sequence_crop_size: int = 256  # N_res
