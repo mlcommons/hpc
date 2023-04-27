@@ -23,7 +23,7 @@ from openfold.model.alphafold import AlphaFold
 from openfold.swa import AlphaFoldSWA
 
 RESUMABLE_CHECKPOINT_FILENAME = "resumable_checkpoint.pt"
-SWA_CHECKPOINT_FILENAME = "swa.pt"
+SWA_CHECKPOINT_FILENAME = "swa_checkpoint.pt"
 
 
 def resume_checkpoint(
