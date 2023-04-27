@@ -17,7 +17,7 @@
 # Usage: sbatch scripts/multi_node_training.sub
 
 #SBATCH --job-name mlperf-hpc:openfold-reference
-#SBATCH --time 04:00:00
+#SBATCH --time 02:15:00
 #SBATCH --nodes 16
 #SBATCH --ntasks-per-node 1
 #SBATCH --exclusive
@@ -36,12 +36,11 @@ echo "SLURM_NODELIST=$SLURM_NODELIST"
 # Download container and give it a name:
 srun \
 --mpi=none \
---ntasks=$SLURM_JOB_NUM_NODES \
 --container-image=openfold_pyt \
 --container-name=$SLURM_JOB_ID \
 bash -c 'echo "srun SLURM_JOB_ID=$SLURM_JOB_ID SLURMD_NODENAME=$SLURMD_NODENAME"'
 
-# Print current datetime again.
+# Print current datetime again:
 echo "READY" $(date +"%Y-%m-%d %H:%M:%S")
 
 # Set number of threads to use for parallel regions:
@@ -51,7 +50,6 @@ export OMP_NUM_THREADS=1
 # Note: MASTER_ADDR and MASTER_PORT variables are set automatically by pyxis.
 srun \
 --mpi=none \
---ntasks=$SLURM_JOB_NUM_NODES \
 --container-name=$SLURM_JOB_ID \
 --container-mounts=/path/to/data:/data:ro,/path/to/training_rundir:/training_rundir \
 bash -c \
@@ -68,23 +66,15 @@ train.py \
 --pdb_mmcif_dicts_dirpath /data/pdb_mmcif/processed/dicts \
 --pdb_obsolete_filepath /data/pdb_mmcif/processed/obsolete.dat \
 --pdb_alignments_dirpath /data/open_protein_set/processed/pdb_alignments \
---initialize_parameters_from /path/to/mlperf_hpc_openfold_resumable_checkpoint.pt \
+--initialize_parameters_from /data/mlperf_hpc_openfold_resumable_checkpoint.pt \
 --seed 1234567890 \
 --num_train_iters 2000 \
---log_every_iters 10 \
---checkpoint_every_iters 50 \
---keep_last_checkpoints 1 \
---val_every_iters 100 \
---keep_best_checkpoints 1 \
---keep_val_checkpoints \
---device_batch_size 1 \
+--val_every_iters 40 \
+--local_batch_size 1 \
 --init_lr 1e-3 \
 --final_lr 5e-5 \
 --warmup_lr_length 0 \
 --init_lr_length 2000 \
---gradient_clipping \
---clip_grad_max_norm 0.1 \
 --num_train_dataloader_workers 14 \
 --num_val_dataloader_workers 2 \
---save_process_logs \
 --distributed'

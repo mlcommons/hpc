@@ -2,7 +2,37 @@
 
 This repository defines the reference implementation for the MLPerf HPC OpenFold benchmark.
 
-## Download datasets
+## Installation
+
+There are 2 options:
+
+1. Build a docker image based on provided Dockerfile (recommended).
+2. Build a local virtual environment using provided scripts.
+
+### Option 1. Build a docker image.
+
+```bash
+docker build -t openfold_pyt -f Dockerfile .
+```
+
+### Option 2. Build a local virtual environment.
+
+```bash
+# build:
+bash scripts/build_local_openfold_venv.sh /path/to/openfold-venv
+
+# activate:
+source scripts/activate_local_openfold_venv.sh /path/to/openfold-venv
+
+# deactivate:
+source scripts/deactivate_local_openfold_venv.sh
+```
+
+## Dataset
+
+### Download original dataset
+
+**You should ignore this and [download already processed dataset and checkpoint for parameter initialization](#download-processed-dataset-and-checkpoint)!**
 
 Note: downloading scripts require `aria2c`, `rsync`, and `AWS CLI`.
 
@@ -29,33 +59,9 @@ data
         └── raw/
 ```
 
-## Installation
+### Preprocess original dataset
 
-There are 2 options:
-
-1. Build a docker image based on provided Dockerfile (recommended).
-2. Build a local virtual environment based on provided scripts.
-
-### Option 1. Build a docker image.
-
-```bash
-docker build -t openfold_pyt -f Dockerfile .
-```
-
-### Option 2. Build a local virtual environment.
-
-```bash
-# build:
-bash scripts/build_local_openfold_venv.sh /path/to/openfold-venv
-
-# activate:
-source scripts/activate_local_openfold_venv.sh /path/to/openfold-venv
-
-# deactivate:
-source scripts/deactivate_local_openfold_venv.sh
-```
-
-## Dataset preprocessing
+**You should ignore this and [download already processed dataset and checkpoint for parameter initialization](#download-processed-dataset-and-checkpoint)!**
 
 ```bash
 python scripts/preprocess_pdb_mmcif.py \
@@ -70,42 +76,110 @@ python scripts/preprocess_open_protein_set.py \
 --num_shards 10
 ```
 
-The above will produce 616 GiB (~1k files).
-
-## Training command
-
-Single GPU training command example:
+The above will produce 616 GiB (~1k files), in the following directory tree:
 
 ```bash
-python train.py \
---training_dirpath /path/to/training_rundir/ \
+data
+├── open_protein_set
+│   └── processed  # 601 GiB (11 files, 1 dir)
+│       └── pdb_alignments/
+└── pdb_mmcif
+    └── processed  # 15 GiB (+1k files)
+        ├── chains.csv
+        ├── obsolete.dat
+        └── dicts/
+```
+
+### Download processed dataset and checkpoint
+
+TODO: add links for download
+
+TODO: make sure the right checkpoint is also available for download
+
+```bash
+data
+├── mlperf_hpc_openfold_resumable_checkpoint.pt  # 1.1 GiB
+├── open_protein_set
+│   └── processed  # 601 GiB (11 files, 1 dir)
+│       └── pdb_alignments/
+└── pdb_mmcif
+    └── processed  # 15 GiB (+1k files)
+        ├── chains.csv
+        ├── obsolete.dat
+        └── dicts/
+```
+
+## Checkpoint
+
+Verify checkpoint:
+
+```bash
+md5sum mlperf_hpc_openfold_resumable_checkpoint.pt
+```
+
+The expected output:
+
+```bash
+98691e238e652b56041b615a135712ea  mlperf_hpc_openfold_resumable_checkpoint.pt
+```
+
+## Multi-node training command
+
+To launch multi-node benchmark training execute the following command once per each node on your system:
+
+```bash
+torchrun \
+--nnodes=16 \
+--nproc_per_node=8 \
+--rdzv_id=$SLURM_JOB_ID \
+--rdzv_backend=c10d \
+--rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
+train.py \
+--training_dirpath /path/to/training_rundir \
 --pdb_mmcif_chains_filepath /data/pdb_mmcif/processed/chains.csv \
 --pdb_mmcif_dicts_dirpath /data/pdb_mmcif/processed/dicts \
 --pdb_obsolete_filepath /data/pdb_mmcif/processed/obsolete.dat \
 --pdb_alignments_dirpath /data/open_protein_set/processed/pdb_alignments \
---initialize_parameters_from /path/to/mlperf_hpc_openfold_resumable_checkpoint.pt \
+--initialize_parameters_from /data/mlperf_hpc_openfold_resumable_checkpoint.pt \
 --seed 1234567890 \
 --num_train_iters 2000 \
---log_every_iters 10 \
---checkpoint_every_iters 50 \
---keep_last_checkpoints 1 \
---val_every_iters 100 \
---keep_best_checkpoints 1 \
---keep_val_checkpoints \
---device_batch_size 1 \
+--val_every_iters 40 \
+--local_batch_size 1 \
 --init_lr 1e-3 \
 --final_lr 5e-5 \
 --warmup_lr_length 0 \
 --init_lr_length 2000 \
---gradient_clipping \
---clip_grad_max_norm 0.1 \
 --num_train_dataloader_workers 14 \
 --num_val_dataloader_workers 2 \
---save_process_logs
+--distributed
 ```
 
-When launching distributed training use also `--distributed` flag.
+SLURM sbatch example: [scripts/multi_node_training.sub](scripts/multi_node_training.sub).
 
-For single node training replace `python train.py` with `torchrun --standalone --nnodes=1 --nproc_per_node=8 train.py`.
+## Single GPU training example
 
-For multi-node training use full syntax: `torchrun --nnodes=16 --nproc_per_node=8 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT train.py` that is executed once per each node. See the [scripts/multi_node_training.sub](scripts/multi_node_training.sub) example.
+Use the following command to launch single GPU sanity check training and validation on two samples:
+
+```bash
+python train.py \
+--training_dirpath /path/to/training_rundir \
+--pdb_mmcif_chains_filepath /data/pdb_mmcif/processed/chains.csv \
+--pdb_mmcif_dicts_dirpath /data/pdb_mmcif/processed/dicts \
+--pdb_obsolete_filepath /data/pdb_mmcif/processed/obsolete.dat \
+--pdb_alignments_dirpath /data/open_protein_set/processed/pdb_alignments \
+--initialize_parameters_from /data/mlperf_hpc_openfold_resumable_checkpoint.pt \
+--train_max_pdb_release_date 2021-12-11 \
+--target_avg_lddt_ca_value 0.9 \
+--seed 1234567890 \
+--num_train_iters 80 \
+--log_every_iters 4 \
+--val_every_iters 8 \
+--local_batch_size 1 \
+--init_lr 1e-3 \
+--final_lr 5e-5 \
+--warmup_lr_length 0 \
+--init_lr_length 80 \
+--num_train_dataloader_workers 2 \
+--num_val_dataloader_workers 1 \
+--use_only_pdb_chain_ids 7ny6_A 7e6g_A
+```
