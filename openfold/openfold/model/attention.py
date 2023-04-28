@@ -101,7 +101,18 @@ class Attention(nn.Module):
         output = output.transpose(-2, -3)
         # output: [*, Q, num_heads, c_hidden]
 
-        output = self._wrap_up(output, input_q)
+        if self.gating:
+            gate = torch.sigmoid(self.linear_g(input_q))
+            # gate: [*, Q, num_heads * c_hidden]
+            gate = gate.view(gate.shape[:-1] + (self.num_heads, self.c_hidden))
+            # gate: [*, Q, num_heads, c_hidden]
+            output = output * gate
+            # output: [*, Q, num_heads, c_hidden]
+
+        output = output.reshape(output.shape[:-2] + (self.num_heads * self.c_hidden,))
+        # output: [*, Q, num_heads * c_hidden]
+
+        output = self.linear_o(output)
         # output: [*, Q, c_q]
 
         return output
@@ -155,27 +166,6 @@ class Attention(nn.Module):
             return _attention_chunked(
                 query, key, value, mask, bias, self.inf, self.chunk_size
             )
-
-    def _wrap_up(
-        self,
-        output: torch.Tensor,
-        input_q: torch.Tensor,
-    ) -> torch.Tensor:
-        if self.gating:
-            gate = torch.sigmoid(self.linear_g(input_q))
-            # gate: [*, Q, num_heads * c_hidden]
-            gate = gate.view(gate.shape[:-1] + (self.num_heads, self.c_hidden))
-            # gate: [*, Q, num_heads, c_hidden]
-            output = output * gate
-            # output: [*, Q, num_heads, c_hidden]
-
-        output = output.reshape(output.shape[:-2] + (self.num_heads * self.c_hidden,))
-        # output: [*, Q, num_heads * c_hidden]
-
-        output = self.linear_o(output)
-        # output: [*, Q, c_q]
-
-        return output
 
 
 def _attention(
