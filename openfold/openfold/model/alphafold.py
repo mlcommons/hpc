@@ -245,8 +245,8 @@ class AlphaFold(nn.Module):
         sm_outputs = self.structure_module(
             s=outputs["single"],
             z=outputs["pair"],
-            aatype=feats["aatype"],
             mask=feats["seq_mask"].to(dtype=s.dtype),
+            aatype=feats["aatype"],
         )
         outputs.update(sm_outputs)
         outputs["final_atom_positions"] = _atom14_to_atom37(
