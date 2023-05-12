@@ -397,8 +397,8 @@ def training(args: argparse.Namespace) -> None:
         device = torch.device("cuda:0")
         global_batch_size = args.local_batch_size
 
-    if is_main_process:
-        args.training_dirpath.mkdir(parents=True, exist_ok=True)
+    # Create output directory:
+    args.training_dirpath.mkdir(parents=True, exist_ok=True)
 
     # MLPerf logging setup:
     mllog_datestamp = os.environ.get("DATESTAMP", "yymmddHHMMSSfffffffff")
