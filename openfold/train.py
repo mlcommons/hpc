@@ -310,11 +310,15 @@ def initialize_parameters_from_checkpoint(
     else:
         init_alphafold_state_dict = checkpoint
         init_optimizer_state_dict = None
+
+    # Initialize alphafold module:
     if verbose:
         print(f"Initializing parameters from {repr(checkpoint_filepath)}...")
     alphafold.load_state_dict(init_alphafold_state_dict, strict=True)
     if verbose:
         print(f"Parameters initialized from {repr(checkpoint_filepath)} successfully!")
+
+    # Initialize optimizer state:
     if init_optimizer_state_dict is not None:
         if verbose:
             print(f"Initializing optimizer from {repr(checkpoint_filepath)}...")
