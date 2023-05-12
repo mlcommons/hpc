@@ -19,7 +19,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from openfold.model.attention import Attention
+from openfold.model.attention import CrossAttentionNoGate
 
 
 class TemplatePointwiseAttention(nn.Module):
@@ -47,13 +47,11 @@ class TemplatePointwiseAttention(nn.Module):
         chunk_size: Optional[int],
     ) -> None:
         super(TemplatePointwiseAttention, self).__init__()
-        self.mha = Attention(
+        self.mha = CrossAttentionNoGate(
             c_q=c_z,
-            c_k=c_t,
-            c_v=c_t,
+            c_kv=c_t,
             c_hidden=c_hidden,
             num_heads=num_heads,
-            gating=False,
             inf=inf,
             chunk_size=chunk_size,
         )
@@ -89,8 +87,7 @@ class TemplatePointwiseAttention(nn.Module):
 
         z = self.mha(
             input_q=z,
-            input_k=t,
-            input_v=t,
+            input_kv=t,
             mask=template_mask,
             bias=None,
         )

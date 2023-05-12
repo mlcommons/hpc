@@ -19,7 +19,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from openfold.model.attention import Attention
+from openfold.model.attention import SelfAttentionWithGate
 from openfold.model.layer_norm import LayerNorm
 from openfold.model.linear import Linear
 
@@ -52,13 +52,10 @@ class TriangleAttention(nn.Module):
         self._is_starting = {"starting": True, "ending": False}[ta_type]
         self.layer_norm = LayerNorm(c_z)
         self.linear = Linear(c_z, num_heads, bias=False, init="normal")
-        self.mha = Attention(
-            c_q=c_z,
-            c_k=c_z,
-            c_v=c_z,
+        self.mha = SelfAttentionWithGate(
+            c_qkv=c_z,
             c_hidden=c_hidden,
             num_heads=num_heads,
-            gating=True,
             inf=inf,
             chunk_size=chunk_size,
         )
@@ -97,9 +94,7 @@ class TriangleAttention(nn.Module):
         # triangle_bias: [batch, 1, num_heads, N_res, N_res]
 
         z = self.mha(
-            input_q=z,
-            input_k=z,
-            input_v=z,
+            input_qkv=z,
             mask=mask,
             bias=triangle_bias,
         )

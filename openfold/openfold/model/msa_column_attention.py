@@ -19,7 +19,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from openfold.model.attention import Attention
+from openfold.model.attention import SelfAttentionWithGate
 from openfold.model.layer_norm import LayerNorm
 
 
@@ -47,13 +47,10 @@ class MSAColumnAttention(nn.Module):
     ) -> None:
         super(MSAColumnAttention, self).__init__()
         self.layer_norm_m = LayerNorm(c_m)
-        self.mha = Attention(
-            c_q=c_m,
-            c_k=c_m,
-            c_v=c_m,
+        self.mha = SelfAttentionWithGate(
+            c_qkv=c_m,
             c_hidden=c_hidden,
             num_heads=num_heads,
-            gating=True,
             inf=inf,
             chunk_size=chunk_size,
         )
@@ -84,9 +81,7 @@ class MSAColumnAttention(nn.Module):
 
         m = self.layer_norm_m(m)
         m = self.mha(
-            input_q=m,
-            input_k=m,
-            input_v=m,
+            input_qkv=m,
             mask=mask,
             bias=None,
         )

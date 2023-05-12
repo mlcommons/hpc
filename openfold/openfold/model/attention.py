@@ -24,16 +24,13 @@ from openfold.helpers import slice_generator
 from openfold.model.linear import Linear
 
 
-class Attention(nn.Module):
-    """Multi-Head Attention module.
+class SelfAttentionWithGate(nn.Module):
+    """Self Multi-Head Attention module with gating.
 
     Args:
-        c_q: Input dimension of query data tensor (channels).
-        c_k: Input dimension of key data tensor (channels).
-        c_v: Input dimension of value data tensor (channels).
+        c_qkv: Input dimension of query|key|data data tensor (channels).
         c_hidden: Hidden dimension (per-head).
         num_heads: Number of attention heads.
-        gating: Whether the output should be gated using query data tensor.
         inf: Safe infinity value.
         chunk_size: Optional chunk size for a batch-like dimension.
             Supplementary '1.11.8 Reducing the memory consumption': Inference.
@@ -42,54 +39,42 @@ class Attention(nn.Module):
 
     def __init__(
         self,
-        c_q: int,
-        c_k: int,
-        c_v: int,
+        c_qkv: int,
         c_hidden: int,
         num_heads: int,
-        gating: bool,
         inf: float,
         chunk_size: Optional[int],
     ) -> None:
-        super(Attention, self).__init__()
-        assert c_k == c_v
-        self.c_q = c_q
-        self.c_k = c_k
-        self.c_v = c_v
+        super(SelfAttentionWithGate, self).__init__()
+        self.c_qkv = c_qkv
         self.c_hidden = c_hidden
         self.num_heads = num_heads
-        self.gating = gating
         self.inf = inf
         self.chunk_size = chunk_size
-        self.linear_q = Linear(c_q, c_hidden * num_heads, bias=False, init="glorot")
-        self.linear_k = Linear(c_k, c_hidden * num_heads, bias=False, init="glorot")
-        self.linear_v = Linear(c_v, c_hidden * num_heads, bias=False, init="glorot")
-        self.linear_o = Linear(c_hidden * num_heads, c_q, bias=True, init="final")
-        if gating:
-            self.linear_g = Linear(c_q, c_hidden * num_heads, bias=True, init="gating")
+        self.linear_q = Linear(c_qkv, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_k = Linear(c_qkv, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_v = Linear(c_qkv, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_o = Linear(c_hidden * num_heads, c_qkv, bias=True, init="final")
+        self.linear_g = Linear(c_qkv, c_hidden * num_heads, bias=True, init="gating")
 
     def forward(
         self,
-        input_q: torch.Tensor,
-        input_k: torch.Tensor,
-        input_v: torch.Tensor,
+        input_qkv: torch.Tensor,
         mask: torch.Tensor,
         bias: Optional[torch.Tensor],
     ) -> torch.Tensor:
         """Attention forward pass.
 
         Args:
-            input_q: [*, Q, c_q] query data
-            input_k: [*, K, c_k] key data
-            input_v: [*, V, c_v] value data
+            input_qkv: [*, QKV, c_qkv] query data (QKV == Q == K == V)
             mask: Logit mask tensor broadcastable to [*, num_heads, Q, K]
             bias: Optional logit bias tensor broadcastable to [*, num_heads, Q, K]
 
         Returns:
-            output: [*, Q, c_q] tensor
+            output: [*, Q, c_qkv] tensor
 
         """
-        query, key, value = self._prep_qkv(input_q, input_k, input_v)
+        query, key, value = self._prep_qkv(input_qkv)
         # query: [*, num_heads, Q, c_hidden]
         # key:   [*, num_heads, K, c_hidden]
         # value: [*, num_heads, V, c_hidden]
@@ -101,13 +86,135 @@ class Attention(nn.Module):
         output = output.transpose(-2, -3)
         # output: [*, Q, num_heads, c_hidden]
 
-        if self.gating:
-            gate = torch.sigmoid(self.linear_g(input_q))
-            # gate: [*, Q, num_heads * c_hidden]
-            gate = gate.view(gate.shape[:-1] + (self.num_heads, self.c_hidden))
-            # gate: [*, Q, num_heads, c_hidden]
-            output = output * gate
-            # output: [*, Q, num_heads, c_hidden]
+        gate = torch.sigmoid(self.linear_g(input_qkv))
+        # gate: [*, Q, num_heads * c_hidden]
+
+        gate = gate.view(gate.shape[:-1] + (self.num_heads, self.c_hidden))
+        # gate: [*, Q, num_heads, c_hidden]
+
+        output = output * gate
+        # output: [*, Q, num_heads, c_hidden]
+
+        output = output.reshape(output.shape[:-2] + (self.num_heads * self.c_hidden,))
+        # output: [*, Q, num_heads * c_hidden]
+
+        output = self.linear_o(output)
+        # output: [*, Q, c_qkv]
+
+        return output
+
+    def _prep_qkv(
+        self,
+        input_qkv: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # input_qkv: [*, QKV, c_qkv]
+
+        q = self.linear_q(input_qkv)
+        k = self.linear_k(input_qkv)
+        v = self.linear_v(input_qkv)
+        # q: [*, Q, num_heads * c_hidden]
+        # k: [*, K, num_heads * c_hidden]
+        # v: [*, V, num_heads * c_hidden]
+
+        q = q.view(q.shape[:-1] + (self.num_heads, self.c_hidden))
+        k = k.view(k.shape[:-1] + (self.num_heads, self.c_hidden))
+        v = v.view(v.shape[:-1] + (self.num_heads, self.c_hidden))
+        # q: [*, Q, num_heads, c_hidden]
+        # k: [*, K, num_heads, c_hidden]
+        # v: [*, V, num_heads, c_hidden]
+
+        q = q.transpose(-2, -3)
+        k = k.transpose(-2, -3)
+        v = v.transpose(-2, -3)
+        # q: [*, num_heads, Q, c_hidden]
+        # k: [*, num_heads, K, c_hidden]
+        # v: [*, num_heads, V, c_hidden]
+
+        q /= math.sqrt(self.c_hidden)
+
+        return q, k, v
+
+    def _attention_forward(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        mask: torch.Tensor,
+        bias: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        if self.chunk_size is None:
+            return _attention(query, key, value, mask, bias, self.inf)
+        else:
+            return _attention_chunked(
+                query, key, value, mask, bias, self.inf, self.chunk_size
+            )
+
+
+class CrossAttentionNoGate(nn.Module):
+    """Cross Multi-Head Attention module without gating.
+
+    Args:
+        c_q: Input dimension of query data tensor (channels).
+        c_kv: Input dimension of key|value data tensor (channels).
+        c_hidden: Hidden dimension (per-head).
+        num_heads: Number of attention heads.
+        inf: Safe infinity value.
+        chunk_size: Optional chunk size for a batch-like dimension.
+            Supplementary '1.11.8 Reducing the memory consumption': Inference.
+
+    """
+
+    def __init__(
+        self,
+        c_q: int,
+        c_kv: int,
+        c_hidden: int,
+        num_heads: int,
+        inf: float,
+        chunk_size: Optional[int],
+    ) -> None:
+        super(CrossAttentionNoGate, self).__init__()
+        self.c_q = c_q
+        self.c_kv = c_kv
+        self.c_hidden = c_hidden
+        self.num_heads = num_heads
+        self.inf = inf
+        self.chunk_size = chunk_size
+        self.linear_q = Linear(c_q, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_k = Linear(c_kv, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_v = Linear(c_kv, c_hidden * num_heads, bias=False, init="glorot")
+        self.linear_o = Linear(c_hidden * num_heads, c_q, bias=True, init="final")
+
+    def forward(
+        self,
+        input_q: torch.Tensor,
+        input_kv: torch.Tensor,
+        mask: torch.Tensor,
+        bias: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        """Attention forward pass.
+
+        Args:
+            input_q: [*, Q, c_q] query data
+            input_kv: [*, KV, c_kv] key|value data (KV == K == V)
+            mask: Logit mask tensor broadcastable to [*, num_heads, Q, K]
+            bias: Optional logit bias tensor broadcastable to [*, num_heads, Q, K]
+
+        Returns:
+            output: [*, Q, c_q] tensor
+
+        """
+        query, key, value = self._prep_qkv(input_q, input_kv)
+        # query: [*, num_heads, Q, c_hidden]
+        # key:   [*, num_heads, K, c_hidden]
+        # value: [*, num_heads, V, c_hidden]
+
+        output = self._attention_forward(query, key, value, mask, bias)
+        # output: [*, num_heads, Q, c_hidden]
+        del query, key, value
+
+        output = output.transpose(-2, -3)
+        # output: [*, Q, num_heads, c_hidden]
 
         output = output.reshape(output.shape[:-2] + (self.num_heads * self.c_hidden,))
         # output: [*, Q, num_heads * c_hidden]
@@ -120,16 +227,14 @@ class Attention(nn.Module):
     def _prep_qkv(
         self,
         input_q: torch.Tensor,
-        input_k: torch.Tensor,
-        input_v: torch.Tensor,
+        input_kv: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # input_q: [*, Q, c_q]
-        # input_k: [*, K, c_k]
-        # input_v: [*, V, c_v]
+        # input_kv: [*, KV, c_kv]
 
         q = self.linear_q(input_q)
-        k = self.linear_k(input_k)
-        v = self.linear_v(input_v)
+        k = self.linear_k(input_kv)
+        v = self.linear_v(input_kv)
         # q: [*, Q, num_heads * c_hidden]
         # k: [*, K, num_heads * c_hidden]
         # v: [*, V, num_heads * c_hidden]
