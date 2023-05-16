@@ -28,7 +28,7 @@ class SelfAttentionWithGate(nn.Module):
     """Self Multi-Head Attention module with gating.
 
     Args:
-        c_qkv: Input dimension of query|key|data data tensor (channels).
+        c_qkv: Input dimension of query|key|value data tensor (channels).
         c_hidden: Hidden dimension (per-head).
         num_heads: Number of attention heads.
         inf: Safe infinity value.
