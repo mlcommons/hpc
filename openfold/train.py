@@ -31,7 +31,11 @@ from openfold.checkpoint_utils import (
     save_checkpoint_from_training,
 )
 from openfold.config import AlphaFoldConfig
-from openfold.dataloaders import InitialTrainingDataloader, ValidationDataloader
+from openfold.dataloaders import (
+    InitialTrainingDataloaderPQ,
+    InitialTrainingDataloaderPT,
+    ValidationDataloader,
+)
 from openfold.datasets import InitialTrainingDataset, ValidationDataset
 from openfold.distributed import dist_gather_val_metrics, dist_reduce_losses_avg
 from openfold.helpers import get_seed_from_string, get_timestamp_string, map_dict_values
@@ -213,6 +217,19 @@ def parse_args() -> argparse.Namespace:
         help="""Gradient accumulation iters.
         The default value of 1 means no accumulation.
         When set to > 1, other _iters and _length args must be scaled accordingly.""",
+    )
+    parser.add_argument(
+        "--initial_training_dataloader_type",
+        choices=["InitialTrainingDataloaderPT", "InitialTrainingDataloaderPQ"],
+        default="InitialTrainingDataloaderPT",
+        help="""Initial training dataloader type.
+        InitialTrainingDataloaderPT - standard PyTorch DataLoader with deterministic
+        sample order.
+        InitialTrainingDataloaderPQ - custom dataloader with non-blocking priority queue
+        based on PyTorch multiprocessing. Ensures higher throughput at the cost of
+        non-deterministic sample order. This dataloader does not wait for time-consuming
+        samples, which results in biased sample order where 'faster' samples may appear
+        before 'slow' ones more frequently than in deterministic sample order.""",
     )
     parser.add_argument(
         "--num_train_dataloader_workers",
@@ -593,6 +610,15 @@ def training(args: argparse.Namespace) -> None:
     )
 
     # Create training dataloader:
+    if args.initial_training_dataloader_type == "InitialTrainingDataloaderPT":
+        InitialTrainingDataloader = InitialTrainingDataloaderPT
+    elif args.initial_training_dataloader_type == "InitialTrainingDataloaderPQ":
+        InitialTrainingDataloader = InitialTrainingDataloaderPQ
+    else:
+        raise ValueError(
+            "unknown initial_training_dataloader_type="
+            f"{repr(args.initial_training_dataloader_type)}"
+        )
     initial_training_dataloader = InitialTrainingDataloader(
         dataset=initial_training_dataset,
         sampler=initial_training_sampler,
