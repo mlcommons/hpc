@@ -197,8 +197,8 @@ class CrossAttentionNoGate(nn.Module):
         Args:
             input_q: [*, Q, c_q] query data
             input_kv: [*, KV, c_kv] key|value data (KV == K == V)
-            mask: Logit mask tensor broadcastable to [*, num_heads, Q, K]
-            bias: Optional logit bias tensor broadcastable to [*, num_heads, Q, K]
+            mask: Logit mask tensor broadcastable to [*, num_heads, Q, KV]
+            bias: Optional logit bias tensor broadcastable to [*, num_heads, Q, KV]
 
         Returns:
             output: [*, Q, c_q] tensor

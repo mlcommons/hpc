@@ -54,8 +54,10 @@ class EvoformerBlockCore(nn.Module):
         pair_dropout: Dropout rate for pair activations.
         inf: Safe infinity value.
         eps_opm: Epsilon to prevent division by zero in outer product mean.
-        chunk_size_opm: Optional chunk size for a batch-like dimension in outer product mean.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_opm: Optional chunk size for a batch-like dimension
+            in outer product mean.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
 
