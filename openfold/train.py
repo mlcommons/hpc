@@ -537,9 +537,6 @@ def training(args: argparse.Namespace) -> None:
     is_logging_enabled = bool(args.log_every_iters > 0)
     is_main_process_and_logging = bool(is_main_process and is_logging_enabled)
 
-    # Start MLPerf time-to-train (TTT) measurement:
-    mllogger.log_init_stop_run_start()
-
     # Start data staging:
     mllogger.event(key="staging_start")
     staging_perf = -time.perf_counter()
@@ -559,6 +556,9 @@ def training(args: argparse.Namespace) -> None:
         value={"staging_duration": staging_perf},
         metadata={"step": 0, "instance": mlperf_instance},
     )
+
+    # Start MLPerf time-to-train (TTT) measurement:
+    mllogger.log_init_stop_run_start()
 
     # Create training dataset:
     initial_training_dataset = InitialTrainingDataset(
