@@ -145,10 +145,9 @@ train.py \
 --num_train_iters 2000 \
 --val_every_iters 40 \
 --local_batch_size 1 \
---init_lr 1e-3 \
---final_lr 5e-5 \
---warmup_lr_length 0 \
---init_lr_length 2000 \
+--base_lr 1e-3 \
+--warmup_lr_init 1e-5 \
+--warmup_lr_iters 0 \
 --num_train_dataloader_workers 14 \
 --num_val_dataloader_workers 2 \
 --distributed
@@ -175,10 +174,9 @@ python train.py \
 --log_every_iters 4 \
 --val_every_iters 8 \
 --local_batch_size 1 \
---init_lr 1e-3 \
---final_lr 5e-5 \
---warmup_lr_length 0 \
---init_lr_length 80 \
+--base_lr 1e-3 \
+--warmup_lr_init 1e-5 \
+--warmup_lr_iters 0 \
 --num_train_dataloader_workers 2 \
 --num_val_dataloader_workers 1 \
 --use_only_pdb_chain_ids 7ny6_A 7e6g_A

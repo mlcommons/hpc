@@ -41,7 +41,7 @@ from openfold.distributed import dist_gather_val_metrics, dist_reduce_losses_avg
 from openfold.helpers import get_seed_from_string, get_timestamp_string, map_dict_values
 from openfold.log_utils import save_logs
 from openfold.loss import AlphaFoldLoss
-from openfold.lr_scheduler import AlphaFoldLRScheduler
+from openfold.lr_scheduler import OpenFoldBenchmarkLRScheduler
 from openfold.model.alphafold import AlphaFold
 from openfold.numpy_utils import NUMPY_SEED_MODULUS
 from openfold.samplers import InitialTrainingSampler, ValidationSampler
@@ -186,29 +186,22 @@ def parse_args() -> argparse.Namespace:
         help="Local batch size.",
     )
     parser.add_argument(
-        "--init_lr",
+        "--base_lr",
         type=float,
         default=1e-3,
-        help="Initial learning rate value.",
+        help="Base learning rate value.",
     )
     parser.add_argument(
-        "--final_lr",
+        "--warmup_lr_init",
         type=float,
-        default=5e-5,
-        help="Final learning rate value.",
+        default=1e-5,
+        help="Warm-up initial learning rate value.",
     )
     parser.add_argument(
-        "--warmup_lr_length",
+        "--warmup_lr_iters",
         type=int,
-        default=1000,
+        default=0,
         help="Num iterations for learning rate warm-up.",
-    )
-    parser.add_argument(
-        "--init_lr_length",
-        type=int,
-        default=60000,
-        help="""Num iterations after which decrease
-        the initial learning rate to its final value.""",
     )
     parser.add_argument(
         "--gradient_accumulation_iters",
@@ -287,8 +280,7 @@ def parse_args() -> argparse.Namespace:
     assert args.val_every_iters % args.gradient_accumulation_iters == 0
     assert args.checkpoint_every_iters % args.gradient_accumulation_iters == 0
     assert args.log_every_iters % args.gradient_accumulation_iters == 0
-    assert args.warmup_lr_length % args.gradient_accumulation_iters == 0
-    assert args.init_lr_length % args.gradient_accumulation_iters == 0
+    assert args.warmup_lr_iters % args.gradient_accumulation_iters == 0
     return args
 
 
@@ -442,7 +434,7 @@ def training(args: argparse.Namespace) -> None:
     mllogger.event(key="number_of_nodes", value=num_nodes)
     mllogger.event(key="accelerators_per_node", value=local_world_size)
     mllogger.event(key=mllogger.constants.GLOBAL_BATCH_SIZE, value=global_batch_size)
-    mllogger.event(key=mllogger.constants.OPT_BASE_LR, value=args.init_lr)
+    mllogger.event(key=mllogger.constants.OPT_BASE_LR, value=args.base_lr)
     mllogger.event(key="precision", value=args.precision)
 
     # Set device:
@@ -478,7 +470,7 @@ def training(args: argparse.Namespace) -> None:
     # Create optimizer:
     optimizer = torch.optim.Adam(
         params=alphafold.parameters(),
-        lr=args.init_lr,  # lr is controlled by AlphaFoldLRScheduler
+        lr=args.base_lr,  # lr is controlled by lr_scheduler
         eps=1e-6,
     )
 
@@ -514,13 +506,11 @@ def training(args: argparse.Namespace) -> None:
     first_iteration = num_prev_iters + 1
 
     # Create learning rate scheduler:
-    lr_scheduler = AlphaFoldLRScheduler(
-        init_lr=args.init_lr,
-        final_lr=args.final_lr,
-        warmup_lr_length=args.warmup_lr_length,
-        init_lr_length=args.init_lr_length,
+    lr_scheduler = OpenFoldBenchmarkLRScheduler(
+        base_lr=args.base_lr,
+        warmup_lr_init=args.warmup_lr_init,
+        warmup_lr_iters=args.warmup_lr_iters,
         optimizer=optimizer,
-        verbose=False,
     )
 
     # Distributed wrapper:
