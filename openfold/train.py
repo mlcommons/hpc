@@ -139,7 +139,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_train_iters",
         type=int,
-        default=80000,
+        default=2000,
         help="Number of training iterations.",
     )
     parser.add_argument(
@@ -165,7 +165,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--val_every_iters",
         type=int,
-        default=200,
+        default=40,
         help="Compute validation every given iteration.",
     )
     parser.add_argument(
