@@ -338,6 +338,13 @@ class AlphaFoldConfig:
     use_clamped_fape_probability: float = 0.9
     self_distillation_plddt_threshold: float = 50.0
 
+    # Adam optimizer constants:
+    optimizer_adam_beta_1 = 0.9
+    optimizer_adam_beta_2 = 0.999
+    optimizer_adam_eps = 1e-6
+    optimizer_adam_weight_decay = 0.0
+    optimizer_adam_amsgrad = False
+
     # Whether to enable gradient clipping by the max norm value:
     gradient_clipping: bool = True
     clip_grad_max_norm: float = 0.1

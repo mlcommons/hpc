@@ -14,6 +14,8 @@
 
 import argparse
 import gc
+import hashlib
+import io
 import os
 import time
 from pathlib import Path
@@ -303,16 +305,20 @@ def initialize_parameters_from_checkpoint(
     checkpoint_filepath: Path,
     device: torch.device,
     verbose: bool,
-) -> None:
-    checkpoint = torch.load(checkpoint_filepath, map_location=device)
+) -> str:
+    init_checkpoint_bytes = checkpoint_filepath.read_bytes()
+    init_checkpoint_md5_hash = hashlib.md5(init_checkpoint_bytes).hexdigest()
+
+    init_checkpoint = torch.load(io.BytesIO(init_checkpoint_bytes), map_location=device)
     is_resumable_checkpoint = bool(
-        "alphafold_state_dict" in checkpoint and "optimizer_state_dict" in checkpoint
+        "alphafold_state_dict" in init_checkpoint
+        and "optimizer_state_dict" in init_checkpoint
     )
     if is_resumable_checkpoint:
-        init_alphafold_state_dict = checkpoint["alphafold_state_dict"]
-        init_optimizer_state_dict = checkpoint["optimizer_state_dict"]
+        init_alphafold_state_dict = init_checkpoint["alphafold_state_dict"]
+        init_optimizer_state_dict = init_checkpoint["optimizer_state_dict"]
     else:
-        init_alphafold_state_dict = checkpoint
+        init_alphafold_state_dict = init_checkpoint
         init_optimizer_state_dict = None
 
     # Initialize alphafold module:
@@ -331,6 +337,8 @@ def initialize_parameters_from_checkpoint(
             print(
                 f"Optimizer initialized from {repr(checkpoint_filepath)} successfully!"
             )
+
+    return init_checkpoint_md5_hash
 
 
 def validation(
@@ -421,16 +429,30 @@ def training(args: argparse.Namespace) -> None:
     mllog_filepath = args.training_dirpath / mllog_filename
     mllog.config(filename=str(mllog_filepath))
     mllogger = MLLoggerWrapper(PyTCommunicationHandler(), value=None)
-    mllogger.start(key=mllog.constants.INIT_START, sync=True)
-    mllogger.event(key=mllog.constants.CACHE_CLEAR, value=True)
+    mllogger.start(key=mllogger.constants.INIT_START, sync=True)
+    mllogger.event(key=mllogger.constants.CACHE_CLEAR, value=True)
     mllogger.mlperf_submission_log(benchmark="openfold", num_nodes=num_nodes)
-    mllogger.event(key=mllog.constants.SEED, value=args.seed)
+    mllogger.event(key=mllogger.constants.SEED, value=args.seed)
     mllogger.event(key="number_of_ranks", value=world_size)
     mllogger.event(key="number_of_nodes", value=num_nodes)
     mllogger.event(key="accelerators_per_node", value=local_world_size)
     mllogger.event(key=mllogger.constants.GLOBAL_BATCH_SIZE, value=global_batch_size)
-    mllogger.event(key=mllogger.constants.OPT_BASE_LR, value=args.base_lr)
-    mllogger.event(key="precision", value=args.precision)
+    mllogger.event(
+        key=mllogger.constants.GRADIENT_ACCUMULATION_STEPS,
+        value=args.gradient_accumulation_iters,
+    )
+    mllogger.event(key="target_avg_lddt_ca_value", value=args.target_avg_lddt_ca_value)
+    mllogger.event(
+        key="train_max_pdb_release_date", value=args.train_max_pdb_release_date
+    )
+    mllogger.event(
+        key="val_min_cameo_submission_date", value=args.val_min_cameo_submission_date
+    )
+    mllogger.event(
+        key="val_max_cameo_submission_date", value=args.val_max_cameo_submission_date
+    )
+    mllogger.event(key="val_max_sequence_length", value=args.val_max_sequence_length)
+    mllogger.event(key="val_every_iters", value=args.val_every_iters)
 
     # Set device:
     torch.cuda.set_device(device=device)
@@ -444,6 +466,7 @@ def training(args: argparse.Namespace) -> None:
         raise NotImplementedError(f"precision={repr(args.precision)}")
     else:
         raise ValueError(f"unknown precision={repr(args.precision)}")
+    mllogger.event(key="precision", value=args.precision)
 
     # Get alphafold config:
     alphafold_config = AlphaFoldConfig.from_preset(
@@ -458,26 +481,103 @@ def training(args: argparse.Namespace) -> None:
         seed=get_seed_from_string(f"alphafold_init_{args.seed}"),
     )
     alphafold.train()
+    mllogger.event(
+        key="train_sequence_crop_size", value=alphafold_config.train_sequence_crop_size
+    )
+    mllogger.event(
+        key="num_recycling_iters", value=alphafold_config.num_recycling_iters
+    )
+    mllogger.event(key="max_msa_clusters", value=alphafold_config.max_msa_clusters)
+    mllogger.event(key="max_extra_msa", value=alphafold_config.max_extra_msa)
+    mllogger.event(key="templates_enabled", value=alphafold_config.templates_enabled)
+    mllogger.event(key="max_templates", value=alphafold_config.max_templates)
 
     # Create alphafold loss module:
     alphafold_loss = AlphaFoldLoss(config=alphafold_config.loss_config)
+    mllogger.event(key="fape_loss_weight", value=alphafold_loss.fape_loss_config.weight)
+    mllogger.event(
+        key="fape_loss_backbone_weight",
+        value=alphafold_loss.fape_loss_config.backbone_weight,
+    )
+    mllogger.event(
+        key="fape_loss_sidechain_weight",
+        value=alphafold_loss.fape_loss_config.sidechain_weight,
+    )
+    mllogger.event(
+        key="supervised_chi_loss_weight",
+        value=alphafold_loss.supervised_chi_loss_config.weight,
+    )
+    mllogger.event(
+        key="distogram_loss_weight", value=alphafold_loss.distogram_loss_config.weight
+    )
+    mllogger.event(
+        key="masked_msa_loss_weight", value=alphafold_loss.masked_msa_loss_config.weight
+    )
+    mllogger.event(
+        key="plddt_loss_weight", value=alphafold_loss.plddt_loss_config.weight
+    )
 
     # Create optimizer:
     optimizer = torch.optim.Adam(
         params=alphafold.parameters(),
         lr=args.base_lr,  # lr is controlled by lr_scheduler
-        eps=1e-6,
+        betas=(
+            alphafold_config.optimizer_adam_beta_1,
+            alphafold_config.optimizer_adam_beta_2,
+        ),
+        eps=alphafold_config.optimizer_adam_eps,
+        weight_decay=alphafold_config.optimizer_adam_weight_decay,
+        amsgrad=alphafold_config.optimizer_adam_amsgrad,
+    )
+    mllogger.event(key=mllogger.constants.OPT_NAME, value="Adam")
+    mllogger.event(key=mllogger.constants.OPT_BASE_LR, value=args.base_lr)
+    mllogger.event(
+        key=mllogger.constants.OPT_ADAM_BETA_1,
+        value=alphafold_config.optimizer_adam_beta_1,
+    )
+    mllogger.event(
+        key=mllogger.constants.OPT_ADAM_BETA_2,
+        value=alphafold_config.optimizer_adam_beta_2,
+    )
+    mllogger.event(
+        key=mllogger.constants.OPT_ADAM_EPSILON,
+        value=alphafold_config.optimizer_adam_eps,
+    )
+    mllogger.event(
+        key=mllogger.constants.OPT_WEIGHT_DECAY,
+        value=alphafold_config.optimizer_adam_weight_decay,
+    )
+    mllogger.event(key="opt_amsgrad", value=alphafold_config.optimizer_adam_amsgrad)
+    mllogger.event(
+        key="opt_gradient_clipping", value=alphafold_config.gradient_clipping
+    )
+    mllogger.event(
+        key=mllogger.constants.OPT_GRADIENT_CLIP_NORM,
+        value=alphafold_config.clip_grad_max_norm,
+    )
+
+    # Create learning rate scheduler:
+    lr_scheduler = OpenFoldBenchmarkLRScheduler(
+        base_lr=args.base_lr,
+        warmup_lr_init=args.warmup_lr_init,
+        warmup_lr_iters=args.warmup_lr_iters,
+        optimizer=optimizer,
+    )
+    mllogger.event(key="opt_learning_rate_warmup_init", value=args.warmup_lr_init)
+    mllogger.event(
+        key=mllogger.constants.OPT_LR_WARMUP_STEPS, value=args.warmup_lr_iters
     )
 
     # Initialize parameters from checkpoint if provided:
     if args.initialize_parameters_from is not None:
-        initialize_parameters_from_checkpoint(
+        init_checkpoint_md5_hash = initialize_parameters_from_checkpoint(
             alphafold=alphafold,
             optimizer=optimizer,
             checkpoint_filepath=args.initialize_parameters_from,
             device=device,
             verbose=is_main_process,
         )
+        mllogger.event(key="init_checkpoint_md5_hash", value=init_checkpoint_md5_hash)
 
     # Create optional SWA version of AlphaFold for evaluation and checkpoints:
     swa_alphafold = AlphaFoldSWA(
@@ -485,6 +585,8 @@ def training(args: argparse.Namespace) -> None:
         enabled=alphafold_config.swa_enabled,
         decay_rate=alphafold_config.swa_decay_rate,
     )
+    mllogger.event(key="swa_enabled", value=alphafold_config.swa_enabled)
+    mllogger.event(key="swa_decay_rate", value=alphafold_config.swa_decay_rate)
 
     # Resume from latest checkpoint if it exists:
     num_prev_iters = resume_from_latest_checkpoint(
@@ -497,20 +599,15 @@ def training(args: argparse.Namespace) -> None:
     )
     assert num_prev_iters % args.gradient_accumulation_iters == 0
 
-    # Set first iteration:
-    first_iteration = num_prev_iters + 1
-
-    # Create learning rate scheduler:
-    lr_scheduler = OpenFoldBenchmarkLRScheduler(
-        base_lr=args.base_lr,
-        warmup_lr_init=args.warmup_lr_init,
-        warmup_lr_iters=args.warmup_lr_iters,
-        optimizer=optimizer,
-    )
-
     # Distributed wrapper:
     if args.distributed:
         alphafold = torch.nn.parallel.DistributedDataParallel(module=alphafold)
+
+    # Log number of model parameters:
+    mllogger.event(
+        key="model_parameters_count",
+        value=sum(p.numel() for p in alphafold.parameters()),
+    )
 
     # Create logging-related objects:
     train_logs = []
@@ -557,6 +654,9 @@ def training(args: argparse.Namespace) -> None:
         use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
         name=f"initial_training_dataset_{process_name}",
     )
+    mllogger.event(
+        key=mllogger.constants.TRAIN_SAMPLES, value=len(initial_training_dataset)
+    )
 
     # Create validation dataset:
     validation_dataset = ValidationDataset(
@@ -572,6 +672,7 @@ def training(args: argparse.Namespace) -> None:
         use_only_pdb_chain_ids=args.use_only_pdb_chain_ids,
         name=f"validation_dataset_{process_name}",
     )
+    mllogger.event(key=mllogger.constants.EVAL_SAMPLES, value=len(validation_dataset))
 
     # Create training sampler:
     initial_training_sampler = InitialTrainingSampler(
@@ -617,6 +718,10 @@ def training(args: argparse.Namespace) -> None:
         num_prev_iters=num_prev_iters,
     )
     train_batch_iterator = iter(initial_training_dataloader)
+    mllogger.event(
+        key="initial_training_dataloader_type",
+        value=args.initial_training_dataloader_type,
+    )
 
     # Create validation dataloader:
     validation_dataloader = ValidationDataloader(
@@ -626,6 +731,7 @@ def training(args: argparse.Namespace) -> None:
     )
 
     # Training loop:
+    first_iteration = num_prev_iters + 1
     for iteration in range(first_iteration, args.num_train_iters + 1):
         # Train-val cycle:
         train_val_cycle_i = (iteration - 1) // args.val_every_iters + 1
