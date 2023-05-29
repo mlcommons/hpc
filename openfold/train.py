@@ -28,10 +28,7 @@ from mlperf_common.frameworks.pyt import PyTCommunicationHandler
 from mlperf_common.logging import MLLoggerWrapper
 from mlperf_logging import mllog
 
-from openfold.checkpoint_utils import (
-    resume_from_latest_checkpoint,
-    save_checkpoint_from_training,
-)
+from openfold.checkpoint_utils import save_checkpoint_from_training
 from openfold.config import AlphaFoldConfig
 from openfold.dataloaders import (
     InitialTrainingDataloaderPQ,
@@ -588,17 +585,6 @@ def training(args: argparse.Namespace) -> None:
     mllogger.event(key="swa_enabled", value=alphafold_config.swa_enabled)
     mllogger.event(key="swa_decay_rate", value=alphafold_config.swa_decay_rate)
 
-    # Resume from latest checkpoint if it exists:
-    num_prev_iters = resume_from_latest_checkpoint(
-        alphafold=alphafold,
-        optimizer=optimizer,
-        swa_alphafold=swa_alphafold,
-        training_dirpath=args.training_dirpath,
-        device=device,
-        verbose=is_main_process,
-    )
-    assert num_prev_iters % args.gradient_accumulation_iters == 0
-
     # Distributed wrapper:
     if args.distributed:
         alphafold = torch.nn.parallel.DistributedDataParallel(module=alphafold)
@@ -684,7 +670,7 @@ def training(args: argparse.Namespace) -> None:
         is_distributed=args.distributed,
         rank=rank,
         world_size=world_size,
-        num_prev_iters=num_prev_iters,
+        num_prev_iters=0,
     )
 
     # Create validation sampler:
@@ -715,7 +701,7 @@ def training(args: argparse.Namespace) -> None:
             range(0, alphafold_config.num_recycling_iters + 1)
         ),
         gradient_accumulation_iters=args.gradient_accumulation_iters,
-        num_prev_iters=num_prev_iters,
+        num_prev_iters=0,
     )
     train_batch_iterator = iter(initial_training_dataloader)
     mllogger.event(
@@ -731,8 +717,7 @@ def training(args: argparse.Namespace) -> None:
     )
 
     # Training loop:
-    first_iteration = num_prev_iters + 1
-    for iteration in range(first_iteration, args.num_train_iters + 1):
+    for iteration in range(1, args.num_train_iters + 1):
         # Train-val cycle:
         train_val_cycle_i = (iteration - 1) // args.val_every_iters + 1
         is_train_val_cycle_start = bool((iteration - 1) % args.val_every_iters == 0)
