@@ -46,12 +46,7 @@ from openfold.model.alphafold import AlphaFold
 from openfold.numpy_utils import NUMPY_SEED_MODULUS
 from openfold.samplers import InitialTrainingSampler, ValidationSampler
 from openfold.swa import AlphaFoldSWA
-from openfold.torch_utils import (
-    TORCH_SEED_MODULUS,
-    disable_tf32,
-    enable_tf32,
-    map_tensor_tree,
-)
+from openfold.torch_utils import disable_tf32, enable_tf32, map_tensor_tree
 from openfold.validation_metrics import compute_validation_metrics
 
 
@@ -630,9 +625,6 @@ def training(args: argparse.Namespace) -> None:
         num_workers=args.num_val_dataloader_workers,
     )
 
-    # Training seed:
-    training_seed = get_seed_from_string(f"training_seed_{args.seed}")
-
     # Training loop:
     for iteration in range(first_iteration, args.num_train_iters + 1):
         # Train-val cycle:
@@ -654,7 +646,9 @@ def training(args: argparse.Namespace) -> None:
         perf_training = -time.perf_counter()
 
         # Deterministic forward pass during training (dropout etc.):
-        torch.manual_seed((training_seed + iteration) % TORCH_SEED_MODULUS)
+        torch.manual_seed(
+            get_seed_from_string(f"forward_{args.seed}_{rank}_{iteration}")
+        )
 
         # Next train batch:
         train_batch = next(train_batch_iterator)
