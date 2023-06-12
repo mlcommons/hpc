@@ -46,6 +46,10 @@ echo "READY" $(date +"%Y-%m-%d %H:%M:%S")
 # Set number of threads to use for parallel regions:
 export OMP_NUM_THREADS=1
 
+# Set MLPerf variables:
+export DATESTAMP=$(date +"%y%m%d%H%M%S%N")
+export EXP_ID=1
+
 # Run the command:
 # Note: MASTER_ADDR and MASTER_PORT variables are set automatically by pyxis.
 srun \
