@@ -92,9 +92,9 @@ data
 
 ### Download processed dataset and checkpoint
 
-TODO: add links for download
-
-TODO: make sure the right checkpoint is also available for download
+Use one of:
+- **Globus (recommended)**: https://app.globus.org/file-manager?origin_id=6b83c9b6-c9dc-11ed-9622-4b6fcc022e5a&path=%2F
+- HTTPS: https://portal.nersc.gov/cfs/m4291/openfold/
 
 ```bash
 data
