@@ -114,13 +114,13 @@ data
 Verify checkpoint:
 
 ```bash
-md5sum mlperf_hpc_openfold_resumable_checkpoint.pt
+sha256sum mlperf_hpc_openfold_resumable_checkpoint.pt
 ```
 
 The expected output:
 
 ```bash
-98691e238e652b56041b615a135712ea  mlperf_hpc_openfold_resumable_checkpoint.pt
+b518be4677048f2c0f94889c91e2da73655a73b825a8aa7f8b6f5e580d8ffbed  mlperf_hpc_openfold_resumable_checkpoint.pt
 ```
 
 ## Multi-node training command

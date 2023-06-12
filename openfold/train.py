@@ -304,7 +304,7 @@ def initialize_parameters_from_checkpoint(
     verbose: bool,
 ) -> str:
     init_checkpoint_bytes = checkpoint_filepath.read_bytes()
-    init_checkpoint_md5_hash = hashlib.md5(init_checkpoint_bytes).hexdigest()
+    init_checkpoint_sha256sum = hashlib.sha256(init_checkpoint_bytes).hexdigest()
 
     init_checkpoint = torch.load(io.BytesIO(init_checkpoint_bytes), map_location=device)
     is_resumable_checkpoint = bool(
@@ -335,7 +335,7 @@ def initialize_parameters_from_checkpoint(
                 f"Optimizer initialized from {repr(checkpoint_filepath)} successfully!"
             )
 
-    return init_checkpoint_md5_hash
+    return init_checkpoint_sha256sum
 
 
 def validation(
@@ -567,14 +567,14 @@ def training(args: argparse.Namespace) -> None:
 
     # Initialize parameters from checkpoint if provided:
     if args.initialize_parameters_from is not None:
-        init_checkpoint_md5_hash = initialize_parameters_from_checkpoint(
+        init_checkpoint_sha256sum = initialize_parameters_from_checkpoint(
             alphafold=alphafold,
             optimizer=optimizer,
             checkpoint_filepath=args.initialize_parameters_from,
             device=device,
             verbose=is_main_process,
         )
-        mllogger.event(key="init_checkpoint_md5_hash", value=init_checkpoint_md5_hash)
+        mllogger.event(key="init_checkpoint_sha256sum", value=init_checkpoint_sha256sum)
 
     # Create optional SWA version of AlphaFold for evaluation and checkpoints:
     swa_alphafold = AlphaFoldSWA(
