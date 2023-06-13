@@ -255,6 +255,12 @@ def parse_args() -> argparse.Namespace:
         help="MLPerf benchmark type.",
     )
     parser.add_argument(
+        "--mlperf_throughput_num_instances",
+        type=int,
+        default=0,
+        help="Num instances used for the MLPerf throughput-oriented benchmark.",
+    )
+    parser.add_argument(
         "--distributed",
         action="store_true",
         help="Whether to enable distributed training.",
@@ -415,10 +421,12 @@ def training(args: argparse.Namespace) -> None:
 
     # MLPerf logging setup:
     mllog_datestamp = os.environ.get("DATESTAMP", "yymmddHHMMSSfffffffff")
-    mlperf_instance = "0"  # TODO: set this value correctly for "Throughput" benchmark
     if args.mlperf_benchmark_type == "TimeToTrain":
+        mlperf_instance = 0
         mllog_suffix = os.environ.get("EXP_ID", "0")
     elif args.mlperf_benchmark_type == "Throughput":
+        assert world_size % args.mlperf_throughput_num_instances == 0
+        mlperf_instance = world_size // args.mlperf_throughput_num_instances
         mllog_suffix = mlperf_instance
     else:
         raise ValueError(f"unknown {repr(args.mlperf_benchmark_type)}")
