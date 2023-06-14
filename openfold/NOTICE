@@ -1,0 +1,5 @@
+This repository defines the reference implementation for the MLPerf HPC OpenFold benchmark.
+
+This repository includes software from https://github.com/deepmind/alphafold licensed under the Apache-2.0 License.
+
+This repository includes software from https://github.com/aqlaboratory/openfold licensed under the Apache-2.0 License.
