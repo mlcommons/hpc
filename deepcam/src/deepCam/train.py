@@ -164,7 +164,7 @@ def main(pargs):
         bucket_cap_mb = 220
     
     # get stream, relevant for graph capture
-    ddp_net = DDP(net, device_ids=[device.index],
+    ddp_net = DDP(net, device_ids=([device.index] if device.index else None),
                   output_device=device.index,
                   find_unused_parameters=False,
                   broadcast_buffers=False,
