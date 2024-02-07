@@ -25,7 +25,7 @@ but please refer to the ExaLearn web portal for additional technical details.
 Globus is the current recommended way to transfer the dataset locally.
 There is a globus endpoint at:
 
-https://app.globus.org/file-manager?origin_id=d0b1b73a-efd3-11e9-993f-0a8c187e8c12&origin_path=%2F
+https://app.globus.org/file-manager?origin_id=31647fba-a006-4322-ad3e-9a4f124db422
 
 The contents are also available via HTTPS at:
 
