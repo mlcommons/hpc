@@ -34,7 +34,6 @@ python ./train.py \
        --output_dir ${output_dir} \
        --model_prefix "segmentation" \
        --optimizer "LAMB" \
-       --adam_eps 1e-6 \
        --start_lr 0.0055 \
        --lr_schedule type="multistep",milestones="800",decay_rate="0.1" \
        --lr_warmup_steps 400 \
